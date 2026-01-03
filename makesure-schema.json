@@ -1,0 +1,159 @@
+{
+  "$ref": "#/definitions/MakesureConfig",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "MakesureConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "pattern": {
+                "description": "Glob of file patterns to which this rule will apply.",
+                "type": "string"
+              },
+              "rules": {
+                "description": "List of rules or rule references to apply to these files",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actions": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to a github comment.",
+                            "properties": {
+                              "name": {
+                                "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+                                "type": "string"
+                              },
+                              "template": {
+                                "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a RuleResult as its evaluation context.",
+                                "type": "string"
+                              },
+                              "urgency": {
+                                "description": "Urgency of report.",
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "urgency",
+                              "template"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "description": "A \"run\" action runs an arbitrary command that receives details about the change as environment variables.",
+                            "properties": {
+                              "args": {
+                                "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a RuleResult as evaluation context.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "command": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  }
+                                ],
+                                "description": "Path to the command. Can be a string or an array of strings which will be evaluated as arguments to produce the command path."
+                              },
+                              "env": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a RuleResult as evaluation context.",
+                                "type": "object"
+                              },
+                              "name": {
+                                "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "command",
+                              "args",
+                              "env"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    },
+                    "filters": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "args": {
+                            "description": "Args to pass to the filter or filter program.",
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "name": {
+                            "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+                            "type": "string"
+                          },
+                          "type": {
+                            "description": "Type of filter to apply. \"auto\" will detect based on file extension.",
+                            "enum": [
+                              "json",
+                              "yaml",
+                              "program",
+                              "auto"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "args"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "name": {
+                      "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "actions",
+                    "filters"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pattern",
+              "rules"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "rules"
+      ],
+      "type": "object"
+    }
+  }
+}
+

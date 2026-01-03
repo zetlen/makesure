@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=./makesure-schema.json
+rules:
+  - pattern: "package.json"
+    rules:
+      - actions:
+          - urgency: 0
+            template: |
+              # Spritz!
+              
+              It is jolly to hilarious.
+
+              ```diff
+              {{diff}}
+              ```
+        filters:
+          - type: "json"
+            args: ["$.dependencies"]
