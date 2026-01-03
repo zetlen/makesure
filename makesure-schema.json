@@ -23,14 +23,14 @@
                         "anyOf": [
                           {
                             "additionalProperties": false,
-                            "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to a github comment.",
+                            "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to stdout or an API call (for example, a GitHub comment).",
                             "properties": {
                               "name": {
                                 "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
                                 "type": "string"
                               },
                               "template": {
-                                "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a RuleResult as its evaluation context.",
+                                "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a FilterResult as its evaluation context.",
                                 "type": "string"
                               },
                               "urgency": {
@@ -49,7 +49,7 @@
                             "description": "A \"run\" action runs an arbitrary command that receives details about the change as environment variables.",
                             "properties": {
                               "args": {
-                                "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a RuleResult as evaluation context.",
+                                "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a FilterResult as evaluation context.",
                                 "items": {
                                   "type": "string"
                                 },
@@ -73,7 +73,7 @@
                                 "additionalProperties": {
                                   "type": "string"
                                 },
-                                "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a RuleResult as evaluation context.",
+                                "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a FilterResult as evaluation context.",
                                 "type": "object"
                               },
                               "name": {
@@ -95,6 +95,7 @@
                     "filters": {
                       "items": {
                         "additionalProperties": false,
+                        "description": "A FileFilter will be run on each side of a file diff to produce artifacts for A and B. A and B can then be diffed. If there is still a diff, the FileFilter returns the diff as part of a FilterResult.",
                         "properties": {
                           "args": {
                             "description": "Args to pass to the filter or filter program.",
@@ -110,8 +111,8 @@
                           "type": {
                             "description": "Type of filter to apply. \"auto\" will detect based on file extension.",
                             "enum": [
-                              "json",
-                              "yaml",
+                              "jq",
+                              "yq",
                               "program",
                               "auto"
                             ],

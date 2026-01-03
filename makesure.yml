@@ -5,13 +5,14 @@ rules:
       - actions:
           - urgency: 0
             template: |
-              # Spritz!
+              # A dependency has changed
               
-              It is jolly to hilarious.
+              A dependency (besides the frequently-iterating "wasm" lib) has changed.
 
               ```diff
-              {{diff}}
+              {{diffText}}
               ```
         filters:
-          - type: "json"
-            args: ["$.dependencies"]
+          - type: "jq"
+            args:
+              - .dependencies | del(.wasm)

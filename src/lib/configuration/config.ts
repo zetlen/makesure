@@ -8,11 +8,16 @@ type ReusableDefinition = {
 }
 
 type SupportedFileFilterName =
-  | "json"
-  | "yaml"
+  | "jq"
+  | "yq"
   | "program"
   | "auto";
 
+/**
+ * A FileFilter will be run on each side of a file diff to produce artifacts for
+ * A and B. A and B can then be diffed. If there is still a diff, the FileFilter
+ * returns the diff as part of a FilterResult.
+ */
 interface FileFilter extends ReusableDefinition {
   /**
    * Type of filter to apply. "auto" will detect based on file extension.
@@ -27,9 +32,20 @@ interface FileFilter extends ReusableDefinition {
 // Will be a union type soon!
 type Filter = FileFilter
 
+interface FilterResult {
+  diffText: string;
+  left: {
+    artifact: string;
+  };
+  right: {
+    artifact: string;
+  }
+}
+
 /**
  * A "report" action produces a text report about the change.
- * It can be routed many places, including to a github comment.
+ * It can be routed many places, including to stdout or an API call
+ * (for example, a GitHub comment).
  */
 interface ReportAction extends ReusableDefinition {
   /**
@@ -38,7 +54,7 @@ interface ReportAction extends ReusableDefinition {
   urgency: number;
   /**
    * Handlebars template for the comment to produce. Accepts markdown,
-   * and receives a RuleResult as its evaluation context.
+   * and receives a FilterResult as its evaluation context.
    */
   template: string;
 }
@@ -55,12 +71,12 @@ interface RunAction extends ReusableDefinition {
   command: string | string[];
   /**
    * If the command requires arguments, they can be evaluated here as Handlebars
-   * templates which receive a RuleResult as evaluation context.
+   * templates which receive a FilterResult as evaluation context.
    */
   args: string[];
   /**
    * If the default environment variables don't suffice, you can define new ones
-   * as Handlebars templates which receive a RuleResult as evaluation context.
+   * as Handlebars templates which receive a FilterResult as evaluation context.
    */
   env: Record<string,string>;
 }
