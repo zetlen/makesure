@@ -99,7 +99,7 @@ type Action = ReportAction | RunAction
 /**
  * A rule defines filters to apply and actions to take when changes match.
  */
-interface Rule extends ReusableDefinition {
+export interface Rule extends ReusableDefinition {
   /**
    * Actions to run when the rule is triggered.
    * Will run once per file that matches the rule's filters.
@@ -117,7 +117,7 @@ interface Rule extends ReusableDefinition {
  * A FileRuleset maps file patterns to rules.
  * Files matching the pattern will have the rules applied to them.
  */
-interface FileRuleset {
+export interface FileRuleset {
   /**
    * Glob pattern for files to which this ruleset applies.
    * Uses minimatch syntax for pattern matching.

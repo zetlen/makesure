@@ -4,7 +4,7 @@ import {execFile} from 'node:child_process'
 import {join, resolve} from 'node:path'
 import {promisify} from 'node:util'
 
-import type {FilterConfig, MakesureConfig} from '../../lib/configuration/config.js'
+import type {FileRuleset, MakesureConfig, Rule} from '../../lib/configuration/config.js'
 
 import {executeReportAction, isReportAction, type ReportOutput} from '../../lib/actions/index.js'
 import {loadConfig} from '../../lib/configuration/loader.js'
@@ -12,16 +12,6 @@ import {type File, type FileVersions, getFileVersions, parseDiff, type RefPair} 
 import {applyFilter, type FilterResult} from '../../lib/filters/index.js'
 
 const execFileAsync = promisify(execFile)
-
-interface Rule {
-  actions: unknown[]
-  filters: FilterConfig[]
-}
-
-interface FileRuleset {
-  pattern: string
-  rules: Rule[]
-}
 
 async function getGitToplevel(cwd: string): Promise<string> {
   const {stdout} = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {cwd})
@@ -59,12 +49,7 @@ async function processRule(rule: Rule, versions: FileVersions, filePath: string)
   return reports
 }
 
-async function processRuleset(
-  ruleset: FileRuleset,
-  file: File,
-  refs: RefPair,
-  cwd: string,
-): Promise<ReportOutput[]> {
+async function processRuleset(ruleset: FileRuleset, file: File, refs: RefPair, cwd: string): Promise<ReportOutput[]> {
   const filePath = file.newPath || file.oldPath
 
   if (!minimatch(filePath, ruleset.pattern)) {
@@ -113,14 +98,14 @@ export default class DiffAnnotate extends Command {
       required: true,
     }),
   }
-static override description = 'Annotate a git diff with semantic analysis based on configured rules'
-static override examples = [
+  static override description = 'Annotate a git diff with semantic analysis based on configured rules'
+  static override examples = [
     '<%= config.bin %> <%= command.id %> HEAD~1 HEAD',
     '<%= config.bin %> <%= command.id %> main feat/foo',
     '<%= config.bin %> <%= command.id %> HEAD . # compare HEAD to working directory',
     '<%= config.bin %> <%= command.id %> main HEAD --repo ../other-project',
   ]
-static override flags = {
+  static override flags = {
     config: Flags.string({
       char: 'c',
       description: 'Path to the makesure configuration file (default: makesure.yml in repo root)',
@@ -135,14 +120,10 @@ static override flags = {
     const {args, flags} = await this.parse(DiffAnnotate)
 
     // Resolve repository path
-    const repoPath = flags.repo
-      ? resolve(process.cwd(), flags.repo)
-      : await getGitToplevel(process.cwd())
+    const repoPath = flags.repo ? resolve(process.cwd(), flags.repo) : await getGitToplevel(process.cwd())
 
     // Resolve config path (default to makesure.yml in repo root)
-    const configPath = flags.config
-      ? resolve(process.cwd(), flags.config)
-      : join(repoPath, 'makesure.yml')
+    const configPath = flags.config ? resolve(process.cwd(), flags.config) : join(repoPath, 'makesure.yml')
 
     // Load configuration
     const config = await loadConfig(configPath)

@@ -17,19 +17,21 @@ Implemented three new file filters for the `makesure` diff:annotate command:
 Extracts content matching a regular expression pattern.
 
 **Args:** `[pattern, flags?]`
+
 - `pattern`: JavaScript regex pattern
 - `flags`: Optional flags (e.g., `i` for case-insensitive). `g` and `m` flags are always applied.
 
 **Example config:**
+
 ```yaml
 rules:
-  - pattern: "**/*.env"
+  - pattern: '**/*.env'
     rules:
       - filters:
           - type: regex
-            args: ["API_KEY=.*"]
+            args: ['API_KEY=.*']
         actions:
-          - template: "API key found in {{filePath}}"
+          - template: 'API key found in {{filePath}}'
             urgency: 10
 ```
 
@@ -38,19 +40,21 @@ rules:
 Extracts nodes from XML/HTML content using XPath expressions.
 
 **Args:** `[expression, namespaces?]`
+
 - `expression`: XPath expression
 - `namespaces`: Optional JSON string mapping prefixes to namespace URIs
 
 **Example config:**
+
 ```yaml
 rules:
-  - pattern: "**/pom.xml"
+  - pattern: '**/pom.xml'
     rules:
       - filters:
           - type: xpath
             args: ["//dependency[groupId='com.example']/version"]
         actions:
-          - template: "Dependency version changed"
+          - template: 'Dependency version changed'
             urgency: 5
 ```
 
@@ -59,6 +63,7 @@ rules:
 Extracts AST nodes using tree-sitter's S-expression query syntax. This enables language-aware code analysis.
 
 **Args:** `[query, captureName?, fileExtension?]`
+
 - `query`: Tree-sitter query pattern (S-expression)
 - `captureName`: Optional capture name to filter results (defaults to all captures)
 - `fileExtension`: Optional file extension override for language detection
@@ -82,26 +87,27 @@ Extracts AST nodes using tree-sitter's S-expression query syntax. This enables l
 ```yaml
 # Find all function declarations in JavaScript
 - type: tsq
-  args: ["(function_declaration) @fn"]
+  args: ['(function_declaration) @fn']
 
 # Find function names only
 - type: tsq
-  args: ["(function_declaration name: (identifier) @name)", "name"]
+  args: ['(function_declaration name: (identifier) @name)', 'name']
 
 # Find Python classes
 - type: tsq
-  args: ["(class_definition name: (identifier) @class-name)", "class-name"]
+  args: ['(class_definition name: (identifier) @class-name)', 'class-name']
 
 # Find TypeScript interfaces
 - type: tsq
-  args: ["(interface_declaration) @iface"]
+  args: ['(interface_declaration) @iface']
 
 # Find Java methods with specific annotation
 - type: tsq
-  args: ["(method_declaration (modifiers (annotation name: (identifier) @ann)) (#eq? @ann \"Override\"))"]
+  args: ['(method_declaration (modifiers (annotation name: (identifier) @ann)) (#eq? @ann "Override"))']
 ```
 
 **Use cases:**
+
 - Track changes to function signatures
 - Monitor class inheritance changes
 - Detect changes in exported APIs
@@ -111,11 +117,13 @@ Extracts AST nodes using tree-sitter's S-expression query syntax. This enables l
 ## Dependencies Added
 
 **Runtime:**
+
 - `web-tree-sitter` - WebAssembly tree-sitter bindings
 - `@xmldom/xmldom` - XML DOM parsing
 - `xpath` - XPath query evaluation
 
 **Language grammars:**
+
 - `tree-sitter-javascript`
 - `tree-sitter-typescript`
 - `tree-sitter-python`
@@ -137,6 +145,7 @@ Extracts AST nodes using tree-sitter's S-expression query syntax. This enables l
 ## Tests
 
 48 total tests passing, including:
+
 - Basic filter functionality for each type
 - Edge cases (null content, identical matches, error handling)
 - Language detection for tsq filter

@@ -1,4 +1,5 @@
 import oclifPrettier from '@oclif/prettier-config'
+
 import pkg from './package.json' with {type: 'json'}
 
 const prettierPlugins = [...new Set([...Object.keys(pkg.dependencies), ...Object.keys(pkg.devDependencies)])].filter(
