@@ -1,18 +1,45 @@
 # yaml-language-server: $schema=./makesure-schema.json
 rules:
-  - pattern: "package.json"
+  - pattern: 'package.json'
     rules:
       - actions:
           - urgency: 0
             template: |
               # A dependency has changed
-              
+
               A dependency (besides the frequently-iterating "workerd" lib) has changed.
 
               ```diff
               {{diffText}}
               ```
         filters:
-          - type: "jq"
-            query: ".dependencies | del(.workerd)"
-              
+          - type: 'jq'
+            query: '.dependencies | del(.workerd)'
+  - pattern: 'src/lib/commands/**/*.ts'
+    rules:
+      - actions:
+          - urgency: 0
+            template: |
+              # Oclif command flags or args have been modified.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: 'ast-grep'
+            pattern: 'class C { static override flags = $FLAGS }'
+          - type: 'ast-grep'
+            pattern: 'class C { static override args = $ARGS }'
+  - pattern: 'README.md'
+    rules:
+      - actions:
+          - urgency: 1
+            template: |
+              # Commands section of readme has changed.
+
+              ```diff
+              {{diffText}}
+              ````
+        filters:
+          - type: 'regex'
+            pattern: "\\n<!-- commands -->.+\\n<!-- commandsstop -->"

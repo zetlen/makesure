@@ -112,7 +112,8 @@ export default class DiffAnnotate extends Command {
     }),
     repo: Flags.string({
       char: 'r',
-      description: 'Path to the git repository (default: toplevel of current directory)',
+      defaultHelp: 'Find the closest top-level git repo to the current directory',
+      description: 'Path to git repository',
     }),
   }
 
