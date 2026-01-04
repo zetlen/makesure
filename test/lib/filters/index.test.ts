@@ -1,34 +1,58 @@
 import {expect} from 'chai'
 
-import {applyFilter, applyJqFilter, applyRegexFilter, applyTsqFilter, applyXpathFilter} from '../../../src/lib/filters/index.js'
+import {
+  applyFilter,
+  type FilterConfig,
+  jqFilter,
+  regexFilter,
+  tsqFilter,
+  xpathFilter,
+} from '../../../src/lib/filters/index.js'
+import {fixtures} from '../../fixtures/loader.js'
 
 describe('filters', () => {
-  describe('applyJqFilter', () => {
-    it('applies jq filter to JSON content', async () => {
-      const versions = {
-        newContent: '{"name": "test", "version": "2.0.0"}',
-        oldContent: '{"name": "test", "version": "1.0.0"}',
-      }
+  describe('jqFilter', () => {
+    it('extracts version from package.json', async () => {
+      const versions = await fixtures.jq.package()
 
-      const result = await applyJqFilter(versions, ['.version'])
+      const result = await jqFilter.apply(versions, {query: '.version', type: 'jq'})
 
       expect(result).to.not.be.null
       expect(result!.left.artifact.trim()).to.equal('"1.0.0"')
       expect(result!.right.artifact.trim()).to.equal('"2.0.0"')
-      // diff output includes the lines with leading +/- but may have other prefixes
-      expect(result!.diffText).to.match(/-"1\.0\.0"/)
-      expect(result!.diffText).to.match(/\+"2\.0\.0"/)
+      expect(result!.diffText).to.include('-"1.0.0"')
+      expect(result!.diffText).to.include('+"2.0.0"')
+    })
+
+    it('extracts dependency names from package.json', async () => {
+      const versions = await fixtures.jq.package()
+
+      const result = await jqFilter.apply(versions, {query: '.dependencies | keys', type: 'jq'})
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.include('express')
+      expect(result!.left.artifact).to.include('lodash')
+      expect(result!.right.artifact).to.include('axios')
     })
 
     it('returns null when filtered content is identical', async () => {
-      const versions = {
-        newContent: '{"name": "test", "other": "different"}',
-        oldContent: '{"name": "test", "other": "changed"}',
-      }
+      const versions = await fixtures.jq.package()
 
-      const result = await applyJqFilter(versions, ['.name'])
+      // Package name is the same in both versions
+      const result = await jqFilter.apply(versions, {query: '.name', type: 'jq'})
 
       expect(result).to.be.null
+    })
+
+    it('extracts script changes from package.json', async () => {
+      const versions = await fixtures.jq.package()
+
+      const result = await jqFilter.apply(versions, {query: '.scripts | keys', type: 'jq'})
+
+      expect(result).to.not.be.null
+      // v2 has a new "lint" script
+      expect(result!.right.artifact).to.include('lint')
+      expect(result!.left.artifact).to.not.include('lint')
     })
 
     it('handles null old content (new file)', async () => {
@@ -37,7 +61,7 @@ describe('filters', () => {
         oldContent: null,
       }
 
-      const result = await applyJqFilter(versions, ['.name'])
+      const result = await jqFilter.apply(versions, {query: '.name', type: 'jq'})
 
       expect(result).to.not.be.null
       expect(result!.left.artifact).to.equal('')
@@ -50,7 +74,7 @@ describe('filters', () => {
         oldContent: '{"name": "test"}',
       }
 
-      const result = await applyJqFilter(versions, ['.name'])
+      const result = await jqFilter.apply(versions, {query: '.name', type: 'jq'})
 
       expect(result).to.not.be.null
       expect(result!.left.artifact.trim()).to.equal('"test"')
@@ -63,37 +87,648 @@ describe('filters', () => {
         oldContent: null,
       }
 
-      const result = await applyJqFilter(versions, ['.name'])
+      const result = await jqFilter.apply(versions, {query: '.name', type: 'jq'})
+
+      expect(result).to.be.null
+    })
+  })
+
+  describe('regexFilter', () => {
+    it('extracts API key changes from env file', async () => {
+      const versions = await fixtures.regex.config()
+
+      const result = await regexFilter.apply(versions, {pattern: 'API_KEY=.*', type: 'regex'})
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.include('sk_test_abc123def456')
+      expect(result!.right.artifact).to.include('sk_live_newkey789ghi')
+    })
+
+    it('extracts all KEY= patterns from env file', async () => {
+      const versions = await fixtures.regex.config()
+
+      const result = await regexFilter.apply(versions, {pattern: '.*_KEY=.*', type: 'regex'})
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.include('API_KEY')
+      expect(result!.left.artifact).to.include('SECRET_KEY')
+    })
+
+    it('extracts feature flag changes', async () => {
+      const versions = await fixtures.regex.config()
+
+      const result = await regexFilter.apply(versions, {pattern: 'FEATURE_.*=.*', type: 'regex'})
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.include('FEATURE_DARK_MODE=false')
+      expect(result!.right.artifact).to.include('FEATURE_DARK_MODE=true')
+      expect(result!.right.artifact).to.include('FEATURE_NEW_UI=true')
+    })
+
+    it('returns null when matches are identical', async () => {
+      const versions = await fixtures.regex.config()
+
+      // DATABASE_PORT is 5432 in both versions
+      const result = await regexFilter.apply(versions, {pattern: 'DATABASE_PORT=5432', type: 'regex'})
 
       expect(result).to.be.null
     })
 
-    it('handles complex jq queries', async () => {
+    it('supports case-insensitive matching', async () => {
       const versions = {
-        newContent: '{"dependencies": {"foo": "1.0", "baz": "3.0"}}',
-        oldContent: '{"dependencies": {"foo": "1.0", "bar": "2.0"}}',
+        newContent: 'FOO bar',
+        oldContent: 'foo bar',
       }
 
-      const result = await applyJqFilter(versions, ['.dependencies | keys'])
+      const result = await regexFilter.apply(versions, {flags: 'i', pattern: 'foo', type: 'regex'})
 
       expect(result).to.not.be.null
-      expect(result!.left.artifact).to.include('bar')
-      expect(result!.right.artifact).to.include('baz')
+      expect(result!.left.artifact).to.equal('foo')
+      expect(result!.right.artifact).to.equal('FOO')
+    })
+
+    it('handles null content', async () => {
+      const versions = {
+        newContent: 'API_KEY=secret123',
+        oldContent: null,
+      }
+
+      const result = await regexFilter.apply(versions, {pattern: 'API_KEY=.*', type: 'regex'})
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.equal('')
+      expect(result!.right.artifact).to.include('secret123')
     })
   })
 
-  describe('applyFilter', () => {
-    it('routes to jq filter for type "jq"', async () => {
-      const versions = {
-        newContent: '{"a": 2}',
-        oldContent: '{"a": 1}',
-      }
+  describe('xpathFilter', () => {
+    it('extracts project version from pom.xml', async () => {
+      const versions = await fixtures.xpath.pom()
 
-      const result = await applyFilter({args: ['.a'], type: 'jq'}, versions)
+      const result = await xpathFilter.apply(versions, {
+        expression: 'string(//*[local-name()="project"]/*[local-name()="version"])',
+        type: 'xpath',
+      })
 
       expect(result).to.not.be.null
-      expect(result!.left.artifact.trim()).to.equal('1')
-      expect(result!.right.artifact.trim()).to.equal('2')
+      expect(result!.left.artifact).to.equal('1.0.0')
+      expect(result!.right.artifact).to.equal('2.0.0')
+    })
+
+    it('extracts all dependency versions from pom.xml', async () => {
+      const versions = await fixtures.xpath.pom()
+
+      const result = await xpathFilter.apply(versions, {
+        expression: '//*[local-name()="dependency"]/*[local-name()="version"]',
+        type: 'xpath',
+      })
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.include('5.3.20')
+      expect(result!.right.artifact).to.include('6.0.9')
+    })
+
+    it('extracts java version property', async () => {
+      const versions = await fixtures.xpath.pom()
+
+      const result = await xpathFilter.apply(versions, {
+        expression: 'string(//*[local-name()="java.version"])',
+        type: 'xpath',
+      })
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.equal('11')
+      expect(result!.right.artifact).to.equal('17')
+    })
+
+    it('returns null when matched nodes are identical', async () => {
+      const versions = await fixtures.xpath.pom()
+
+      // modelVersion is 4.0.0 in both
+      const result = await xpathFilter.apply(versions, {
+        expression: 'string(//*[local-name()="modelVersion"])',
+        type: 'xpath',
+      })
+
+      expect(result).to.be.null
+    })
+
+    it('handles null content', async () => {
+      const versions = {
+        newContent: '<root><item>value</item></root>',
+        oldContent: null,
+      }
+
+      const result = await xpathFilter.apply(versions, {expression: '//item', type: 'xpath'})
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.equal('')
+      expect(result!.right.artifact).to.include('value')
+    })
+  })
+
+  describe('tsqFilter', () => {
+    describe('JavaScript', () => {
+      it('extracts function declarations', async () => {
+        const versions = await fixtures.tsq.javascript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {query: '(function_declaration) @fn', type: 'tsq'},
+          'utils.js',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('function calculateSum')
+        expect(result!.left.artifact).to.include('function formatCurrency')
+        expect(result!.right.artifact).to.include('function validateEmail')
+        expect(result!.right.artifact).to.include('function calculateDifference')
+      })
+
+      it('extracts function names only', async () => {
+        const versions = await fixtures.tsq.javascript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(function_declaration name: (identifier) @name)', type: 'tsq'},
+          'utils.js',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('calculateSum')
+        expect(result!.right.artifact).to.include('validateEmail')
+        expect(result!.right.artifact).to.include('calculateDifference')
+      })
+
+      it('extracts class declarations', async () => {
+        const versions = await fixtures.tsq.javascript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(class_declaration name: (identifier) @name)', type: 'tsq'},
+          'utils.js',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('UserService')
+        expect(result!.right.artifact).to.include('CacheService')
+      })
+    })
+
+    describe('TypeScript', () => {
+      it('extracts interface declarations', async () => {
+        const versions = await fixtures.tsq.typescript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {query: '(interface_declaration) @iface', type: 'tsq'},
+          'types.ts',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('interface User')
+        expect(result!.right.artifact).to.include('interface Order')
+        expect(result!.right.artifact).to.include('interface PaginatedResponse')
+      })
+
+      it('extracts interface names only', async () => {
+        const versions = await fixtures.tsq.typescript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(interface_declaration name: (type_identifier) @name)', type: 'tsq'},
+          'types.ts',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.right.artifact).to.include('Order')
+        expect(result!.right.artifact).to.include('PaginatedResponse')
+      })
+
+      it('extracts type aliases', async () => {
+        const versions = await fixtures.tsq.typescript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(type_alias_declaration name: (type_identifier) @name)', type: 'tsq'},
+          'types.ts',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.right.artifact).to.include('OrderStatus')
+      })
+
+      it('extracts class methods', async () => {
+        const versions = await fixtures.tsq.typescript()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(method_definition name: (property_identifier) @name)', type: 'tsq'},
+          'types.ts',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.right.artifact).to.include('findByEmail')
+        expect(result!.right.artifact).to.include('delete')
+        expect(result!.right.artifact).to.include('findAll')
+      })
+    })
+
+    describe('Python', () => {
+      it('extracts class definitions', async () => {
+        const versions = await fixtures.tsq.python()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(class_definition name: (identifier) @name)', type: 'tsq'},
+          'models.py',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('User')
+        expect(result!.left.artifact).to.include('UserRepository')
+        expect(result!.right.artifact).to.include('OrderRepository')
+        expect(result!.right.artifact).to.include('UserRole')
+        expect(result!.right.artifact).to.include('OrderStatus')
+      })
+
+      it('extracts function definitions', async () => {
+        const versions = await fixtures.tsq.python()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(function_definition name: (identifier) @name)', type: 'tsq'},
+          'models.py',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('create_user')
+        expect(result!.left.artifact).to.include('format_price')
+        expect(result!.right.artifact).to.include('calculate_order_total')
+        expect(result!.right.artifact).to.include('validate_email')
+      })
+
+      it('extracts decorated functions', async () => {
+        const versions = await fixtures.tsq.python()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {query: '(decorated_definition) @decorated', type: 'tsq'},
+          'models.py',
+        )
+
+        expect(result).to.not.be.null
+        // Both have @dataclass decorated classes
+        expect(result!.left.artifact).to.include('@dataclass')
+        expect(result!.right.artifact).to.include('@dataclass')
+      })
+    })
+
+    describe('Go', () => {
+      it('extracts function declarations', async () => {
+        const versions = await fixtures.tsq.go()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(function_declaration name: (identifier) @name)', type: 'tsq'},
+          'handlers.go',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('NewUserHandler')
+        expect(result!.right.artifact).to.include('NewProductHandler')
+        expect(result!.right.artifact).to.include('sendJSON')
+        expect(result!.right.artifact).to.include('sendError')
+      })
+
+      it('extracts struct type declarations', async () => {
+        const versions = await fixtures.tsq.go()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(type_declaration (type_spec name: (type_identifier) @name (struct_type)))', type: 'tsq'},
+          'handlers.go',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('User')
+        expect(result!.left.artifact).to.include('UserHandler')
+        expect(result!.right.artifact).to.include('Product')
+        expect(result!.right.artifact).to.include('ApiResponse')
+        expect(result!.right.artifact).to.include('ProductHandler')
+      })
+
+      it('extracts method declarations', async () => {
+        const versions = await fixtures.tsq.go()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(method_declaration name: (field_identifier) @name)', type: 'tsq'},
+          'handlers.go',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('GetUser')
+        expect(result!.left.artifact).to.include('CreateUser')
+        expect(result!.right.artifact).to.include('UpdateUser')
+        expect(result!.right.artifact).to.include('DeleteUser')
+        expect(result!.right.artifact).to.include('GetProduct')
+        expect(result!.right.artifact).to.include('ListProducts')
+      })
+    })
+
+    describe('Java', () => {
+      it('extracts class declarations', async () => {
+        const versions = await fixtures.tsq.java()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(class_declaration name: (identifier) @name)', type: 'tsq'},
+          'UserService.java',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('UserService')
+        expect(result!.left.artifact).to.include('User')
+        expect(result!.right.artifact).to.include('ProductService')
+        expect(result!.right.artifact).to.include('Product')
+      })
+
+      it('extracts interface declarations', async () => {
+        const versions = await fixtures.tsq.java()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(interface_declaration name: (identifier) @name)', type: 'tsq'},
+          'UserService.java',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('UserRepository')
+        expect(result!.right.artifact).to.include('AuditLogger')
+      })
+
+      it('extracts method declarations', async () => {
+        const versions = await fixtures.tsq.java()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(method_declaration name: (identifier) @name)', type: 'tsq'},
+          'UserService.java',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('findById')
+        expect(result!.left.artifact).to.include('save')
+        expect(result!.right.artifact).to.include('findByEmail')
+        expect(result!.right.artifact).to.include('findByRole')
+        expect(result!.right.artifact).to.include('updateEmail')
+      })
+
+      it('extracts enum declarations', async () => {
+        const versions = await fixtures.tsq.java()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(enum_declaration name: (identifier) @name)', type: 'tsq'},
+          'UserService.java',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.equal('')
+        expect(result!.right.artifact).to.include('UserRole')
+      })
+    })
+
+    describe('Rust', () => {
+      it('extracts struct definitions', async () => {
+        const versions = await fixtures.tsq.rust()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(struct_item name: (type_identifier) @name)', type: 'tsq'},
+          'lib.rs',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('User')
+        expect(result!.left.artifact).to.include('UserRepository')
+        expect(result!.right.artifact).to.include('Product')
+        expect(result!.right.artifact).to.include('ProductRepository')
+      })
+
+      it('extracts impl blocks', async () => {
+        const versions = await fixtures.tsq.rust()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {query: '(impl_item) @impl', type: 'tsq'},
+          'lib.rs',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('impl User')
+        expect(result!.left.artifact).to.include('impl UserRepository')
+        expect(result!.right.artifact).to.include('impl Repository<User>')
+        expect(result!.right.artifact).to.include('impl Repository<Product>')
+      })
+
+      it('extracts function definitions', async () => {
+        const versions = await fixtures.tsq.rust()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(function_item name: (identifier) @name)', type: 'tsq'},
+          'lib.rs',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('format_user')
+        expect(result!.right.artifact).to.include('calculate_total')
+        expect(result!.right.artifact).to.include('validate_email')
+      })
+
+      it('extracts enum definitions', async () => {
+        const versions = await fixtures.tsq.rust()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(enum_item name: (type_identifier) @name)', type: 'tsq'},
+          'lib.rs',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.equal('')
+        expect(result!.right.artifact).to.include('UserRole')
+      })
+
+      it('extracts trait definitions', async () => {
+        const versions = await fixtures.tsq.rust()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', query: '(trait_item name: (type_identifier) @name)', type: 'tsq'},
+          'lib.rs',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.equal('')
+        expect(result!.right.artifact).to.include('Repository')
+      })
+    })
+
+    describe('JSON', () => {
+      it('extracts all string values', async () => {
+        const versions = await fixtures.tsq.json()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {query: '(string) @str', type: 'tsq'},
+          'config.json',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.include('"development"')
+        expect(result!.right.artifact).to.include('"production"')
+        expect(result!.right.artifact).to.include('"us-east-1"')
+      })
+
+      it('extracts object keys', async () => {
+        const versions = await fixtures.tsq.json()
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'key', query: '(pair key: (string) @key)', type: 'tsq'},
+          'config.json',
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.right.artifact).to.include('"cache"')
+        expect(result!.right.artifact).to.include('"region"')
+        expect(result!.right.artifact).to.include('"ssl"')
+      })
+    })
+
+    describe('error handling', () => {
+      it('returns null when matches are identical', async () => {
+        const versions = {
+          newContent: 'function same() { }\nconst x = different;',
+          oldContent: 'function same() { }\nconst y = other;',
+        }
+
+        const result = await tsqFilter.apply(
+          versions,
+          {query: '(function_declaration) @fn', type: 'tsq'},
+          'test.js',
+        )
+
+        expect(result).to.be.null
+      })
+
+      it('handles language override in config', async () => {
+        const versions = {
+          newContent: 'function bar() { }',
+          oldContent: 'function foo() { }',
+        }
+
+        const result = await tsqFilter.apply(
+          versions,
+          {capture: 'name', language: '.js', query: '(function_declaration name: (identifier) @name)', type: 'tsq'},
+        )
+
+        expect(result).to.not.be.null
+        expect(result!.left.artifact).to.equal('foo')
+        expect(result!.right.artifact).to.equal('bar')
+      })
+
+      it('throws when language cannot be determined', async () => {
+        const versions = {
+          newContent: 'some content',
+          oldContent: 'other content',
+        }
+
+        try {
+          await tsqFilter.apply(versions, {query: '(identifier) @id', type: 'tsq'})
+          expect.fail('Should have thrown')
+        } catch (error) {
+          expect((error as Error).message).to.include('requires a file extension')
+        }
+      })
+
+      it('throws for unsupported language', async () => {
+        const versions = {
+          newContent: 'some content',
+          oldContent: 'other content',
+        }
+
+        try {
+          await tsqFilter.apply(versions, {query: '(identifier) @id', type: 'tsq'}, 'test.xyz')
+          expect.fail('Should have thrown')
+        } catch (error) {
+          expect((error as Error).message).to.include('Unsupported language')
+        }
+      })
+    })
+  })
+
+  describe('applyFilter (orchestrator)', () => {
+    it('routes to jq filter with FilterConfig', async () => {
+      const versions = await fixtures.jq.package()
+      const config: FilterConfig = {query: '.version', type: 'jq'}
+
+      const result = await applyFilter(config, versions)
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact.trim()).to.equal('"1.0.0"')
+      expect(result!.right.artifact.trim()).to.equal('"2.0.0"')
+    })
+
+    it('routes to regex filter with FilterConfig', async () => {
+      const versions = await fixtures.regex.config()
+      const config: FilterConfig = {pattern: 'API_KEY=.*', type: 'regex'}
+
+      const result = await applyFilter(config, versions)
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.include('sk_test')
+      expect(result!.right.artifact).to.include('sk_live')
+    })
+
+    it('routes to xpath filter with FilterConfig', async () => {
+      const versions = await fixtures.xpath.pom()
+      const config: FilterConfig = {
+        expression: 'string(//*[local-name()="project"]/*[local-name()="version"])',
+        type: 'xpath',
+      }
+
+      const result = await applyFilter(config, versions)
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact).to.equal('1.0.0')
+      expect(result!.right.artifact).to.equal('2.0.0')
+    })
+
+    it('routes to tsq filter with FilterConfig', async () => {
+      const versions = await fixtures.tsq.javascript()
+      const config: FilterConfig = {
+        capture: 'name',
+        query: '(function_declaration name: (identifier) @name)',
+        type: 'tsq',
+      }
+
+      const result = await applyFilter(config, versions, 'utils.js')
+
+      expect(result).to.not.be.null
+      expect(result!.right.artifact).to.include('validateEmail')
+    })
+
+    it('supports legacy args format for backwards compatibility', async () => {
+      const versions = await fixtures.jq.package()
+
+      const result = await applyFilter({args: ['.version'], type: 'jq'}, versions)
+
+      expect(result).to.not.be.null
+      expect(result!.left.artifact.trim()).to.equal('"1.0.0"')
     })
 
     it('throws for unsupported filter type', async () => {
@@ -107,320 +742,6 @@ describe('filters', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect((error as Error).message).to.include('Unsupported filter type')
-      }
-    })
-
-    it('routes to regex filter for type "regex"', async () => {
-      const versions = {
-        newContent: 'hello world\nfoo bar\nhello again',
-        oldContent: 'hello world\nfoo baz\nhello again',
-      }
-
-      const result = await applyFilter({args: ['hello.*'], type: 'regex'}, versions)
-
-      expect(result).to.be.null // Both have same "hello" matches
-    })
-
-    it('routes to xpath filter for type "xpath"', async () => {
-      const versions = {
-        newContent: '<root><item>new</item></root>',
-        oldContent: '<root><item>old</item></root>',
-      }
-
-      const result = await applyFilter({args: ['//item'], type: 'xpath'}, versions)
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.include('old')
-      expect(result!.right.artifact).to.include('new')
-    })
-
-    it('routes to tsq filter for type "tsq"', async () => {
-      const versions = {
-        newContent: 'function bar() { return 2; }',
-        oldContent: 'function foo() { return 1; }',
-      }
-
-      const result = await applyFilter(
-        {args: ['(function_declaration name: (identifier) @fn-name)', 'fn-name', '.js'], type: 'tsq'},
-        versions,
-      )
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('foo')
-      expect(result!.right.artifact).to.equal('bar')
-    })
-  })
-
-  describe('applyRegexFilter', () => {
-    it('extracts matching lines from content', async () => {
-      const versions = {
-        newContent: 'line1: foo\nline2: bar\nline3: foo',
-        oldContent: 'line1: foo\nline2: baz\nline3: foo',
-      }
-
-      const result = await applyRegexFilter(versions, ['bar|baz'])
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('baz')
-      expect(result!.right.artifact).to.equal('bar')
-    })
-
-    it('returns null when matches are identical', async () => {
-      const versions = {
-        newContent: 'foo bar baz\nqux quux',
-        oldContent: 'foo bar baz\nother stuff',
-      }
-
-      const result = await applyRegexFilter(versions, ['foo.*baz'])
-
-      expect(result).to.be.null
-    })
-
-    it('supports case-insensitive matching', async () => {
-      const versions = {
-        newContent: 'FOO bar',
-        oldContent: 'foo bar',
-      }
-
-      // With case insensitive, both match "foo" and "FOO" respectively
-      // But the actual matched strings are different, so this returns a result
-      const result = await applyRegexFilter(versions, ['foo', 'i'])
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('foo')
-      expect(result!.right.artifact).to.equal('FOO')
-    })
-
-    it('handles null content', async () => {
-      const versions = {
-        newContent: 'hello world',
-        oldContent: null,
-      }
-
-      const result = await applyRegexFilter(versions, ['hello'])
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('')
-      expect(result!.right.artifact).to.equal('hello')
-    })
-
-    it('throws when no pattern provided', async () => {
-      const versions = {
-        newContent: 'test',
-        oldContent: 'test',
-      }
-
-      try {
-        await applyRegexFilter(versions, [])
-        expect.fail('Should have thrown')
-      } catch (error) {
-        expect((error as Error).message).to.include('requires at least a pattern')
-      }
-    })
-  })
-
-  describe('applyXpathFilter', () => {
-    it('extracts matching nodes from XML', async () => {
-      const versions = {
-        newContent: '<root><name>bob</name><age>30</age></root>',
-        oldContent: '<root><name>alice</name><age>25</age></root>',
-      }
-
-      const result = await applyXpathFilter(versions, ['//name'])
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.include('alice')
-      expect(result!.right.artifact).to.include('bob')
-    })
-
-    it('returns null when matched nodes are identical', async () => {
-      const versions = {
-        newContent: '<root><name>same</name><other>different2</other></root>',
-        oldContent: '<root><name>same</name><other>different1</other></root>',
-      }
-
-      const result = await applyXpathFilter(versions, ['//name'])
-
-      expect(result).to.be.null
-    })
-
-    it('handles XPath that returns text content', async () => {
-      const versions = {
-        newContent: '<root><item>new</item></root>',
-        oldContent: '<root><item>old</item></root>',
-      }
-
-      const result = await applyXpathFilter(versions, ['string(//item)'])
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('old')
-      expect(result!.right.artifact).to.equal('new')
-    })
-
-    it('handles null content', async () => {
-      const versions = {
-        newContent: '<root><item>value</item></root>',
-        oldContent: null,
-      }
-
-      const result = await applyXpathFilter(versions, ['//item'])
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('')
-      expect(result!.right.artifact).to.include('value')
-    })
-
-    it('throws when no expression provided', async () => {
-      const versions = {
-        newContent: '<root/>',
-        oldContent: '<root/>',
-      }
-
-      try {
-        await applyXpathFilter(versions, [])
-        expect.fail('Should have thrown')
-      } catch (error) {
-        expect((error as Error).message).to.include('requires at least an expression')
-      }
-    })
-  })
-
-  describe('applyTsqFilter', () => {
-    it('extracts function declarations from JavaScript', async () => {
-      const versions = {
-        newContent: 'function hello() { return "world"; }\nfunction goodbye() { }',
-        oldContent: 'function hello() { return "hello"; }',
-      }
-
-      const result = await applyTsqFilter(versions, ['(function_declaration) @fn'], 'test.js')
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.include('function hello')
-      expect(result!.right.artifact).to.include('function hello')
-      expect(result!.right.artifact).to.include('function goodbye')
-    })
-
-    it('extracts specific capture names', async () => {
-      const versions = {
-        newContent: 'function bar() { }',
-        oldContent: 'function foo() { }',
-      }
-
-      const result = await applyTsqFilter(
-        versions,
-        ['(function_declaration name: (identifier) @name)', 'name'],
-        'test.js',
-      )
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('foo')
-      expect(result!.right.artifact).to.equal('bar')
-    })
-
-    it('extracts class declarations from Python', async () => {
-      const versions = {
-        newContent: 'class NewClass:\n    pass',
-        oldContent: 'class OldClass:\n    pass',
-      }
-
-      const result = await applyTsqFilter(
-        versions,
-        ['(class_definition name: (identifier) @class-name)', 'class-name'],
-        'test.py',
-      )
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('OldClass')
-      expect(result!.right.artifact).to.equal('NewClass')
-    })
-
-    it('works with TypeScript', async () => {
-      const versions = {
-        newContent: 'interface Foo { x: number; y: number; }',
-        oldContent: 'interface Foo { x: number; }',
-      }
-
-      const result = await applyTsqFilter(
-        versions,
-        ['(interface_declaration) @iface'],
-        'test.ts',
-      )
-
-      expect(result).to.not.be.null
-      expect(result!.right.artifact).to.include('y: number')
-    })
-
-    it('returns null when matches are identical', async () => {
-      const versions = {
-        newContent: 'function same() { }\nconst x = different;',
-        oldContent: 'function same() { }\nconst y = other;',
-      }
-
-      const result = await applyTsqFilter(
-        versions,
-        ['(function_declaration) @fn'],
-        'test.js',
-      )
-
-      expect(result).to.be.null
-    })
-
-    it('handles file extension override in args', async () => {
-      const versions = {
-        newContent: 'function bar() { }',
-        oldContent: 'function foo() { }',
-      }
-
-      // Using file extension override in args (third element)
-      const result = await applyTsqFilter(
-        versions,
-        ['(function_declaration name: (identifier) @name)', 'name', '.js'],
-      )
-
-      expect(result).to.not.be.null
-      expect(result!.left.artifact).to.equal('foo')
-      expect(result!.right.artifact).to.equal('bar')
-    })
-
-    it('throws when no query provided', async () => {
-      const versions = {
-        newContent: 'function foo() { }',
-        oldContent: 'function foo() { }',
-      }
-
-      try {
-        await applyTsqFilter(versions, [], 'test.js')
-        expect.fail('Should have thrown')
-      } catch (error) {
-        expect((error as Error).message).to.include('requires at least a query')
-      }
-    })
-
-    it('throws when language cannot be determined', async () => {
-      const versions = {
-        newContent: 'some content',
-        oldContent: 'other content',
-      }
-
-      try {
-        await applyTsqFilter(versions, ['(identifier) @id'])
-        expect.fail('Should have thrown')
-      } catch (error) {
-        expect((error as Error).message).to.include('requires a file extension')
-      }
-    })
-
-    it('throws for unsupported language', async () => {
-      const versions = {
-        newContent: 'some content',
-        oldContent: 'other content',
-      }
-
-      try {
-        await applyTsqFilter(versions, ['(identifier) @id'], 'test.xyz')
-        expect.fail('Should have thrown')
-      } catch (error) {
-        expect((error as Error).message).to.include('Unsupported language')
       }
     })
   })

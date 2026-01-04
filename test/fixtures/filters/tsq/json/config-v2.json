@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "MyApp",
+    "version": "2.0.0",
+    "environment": "production",
+    "region": "us-east-1"
+  },
+  "database": {
+    "host": "db.example.com",
+    "port": 5432,
+    "name": "myapp_prod",
+    "ssl": true,
+    "poolSize": 10
+  },
+  "features": {
+    "darkMode": true,
+    "betaAccess": true,
+    "newUI": true
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "destination": "cloudwatch"
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 3600
+  }
+}
