@@ -1,0 +1,15 @@
+pre-commit:
+  commands:
+    format:
+      skip:
+        - rebase
+        - merge
+      run: npm run format {staged_files}
+      stage_fixed: true
+    lint:
+      skip:
+        - rebase
+        - merge
+      run: npm run eslint --fix {staged_files}
+      stage_fixed: true
+      glob: '*.{js,ts,jsx,tsx}'
