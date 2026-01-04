@@ -2,8 +2,80 @@
   "$ref": "#/definitions/MakesureConfig",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "AstGrepFilterConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for the ast-grep filter. Extracts AST nodes from source code using ast-grep's pattern syntax. Patterns look like actual code with metavariables ($VAR) for wildcards.",
+      "properties": {
+        "language": {
+          "$ref": "#/definitions/AstGrepLanguage",
+          "description": "The language to use for parsing. If not specified, the language is inferred from the file extension.\n\nSupported languages: c, cpp, css, go, html, java, javascript, json, kotlin, lua, python, rust, scala, swift, typescript, tsx",
+          "examples": [
+            "javascript",
+            "python",
+            "typescript"
+          ]
+        },
+        "name": {
+          "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "The pattern to match against the source code. Uses ast-grep's pattern syntax which looks like actual code.\n\nMetavariables:\n- `$VAR`: Matches any single AST node\n- `$$$VAR`: Matches zero or more AST nodes (for sequences like arguments)",
+          "examples": [
+            "console.log($$$ARGS)",
+            "function $NAME($$$PARAMS) { $$$BODY }",
+            "import { $$$IMPORTS } from '$MODULE'"
+          ],
+          "type": "string"
+        },
+        "selector": {
+          "description": "Optional AST node kind to use as a selector for more precise matching. When specified, only nodes of this kind that match the pattern are returned. This is useful when a pattern might match unintended node types.",
+          "examples": [
+            "function_declaration",
+            "class_declaration",
+            "call_expression"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "ast-grep",
+          "description": "Discriminant tag identifying this as an ast-grep filter.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern",
+        "type"
+      ],
+      "type": "object"
+    },
+    "AstGrepLanguage": {
+      "description": "Supported languages for ast-grep. These correspond to the --lang flag values.",
+      "enum": [
+        "c",
+        "cpp",
+        "css",
+        "go",
+        "html",
+        "java",
+        "javascript",
+        "json",
+        "kotlin",
+        "lua",
+        "python",
+        "rust",
+        "scala",
+        "swift",
+        "tsx",
+        "typescript"
+      ],
+      "type": "string"
+    },
     "FilterConfig": {
       "anyOf": [
+        {
+          "$ref": "#/definitions/AstGrepFilterConfig"
+        },
         {
           "$ref": "#/definitions/JqFilterConfig"
         },

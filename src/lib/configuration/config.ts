@@ -1,3 +1,4 @@
+import type {AstGrepFilterConfig} from '../filters/ast-grep.js'
 import type {JqFilterConfig} from '../filters/jq.js'
 import type {RegexFilterConfig} from '../filters/regex.js'
 import type {TsqFilterConfig} from '../filters/tsq.js'
@@ -17,6 +18,7 @@ type ReusableDefinition = {
 }
 
 // Re-export filter config types for convenience
+export type {AstGrepFilterConfig} from '../filters/ast-grep.js'
 export type {JqFilterConfig} from '../filters/jq.js'
 export type {RegexFilterConfig} from '../filters/regex.js'
 export type {TsqFilterConfig} from '../filters/tsq.js'
@@ -29,12 +31,14 @@ export type {FilterResult} from '../filters/types.js'
  * Union type of all supported filter configurations.
  * Each filter type has its own specific properties with the 'type' field as discriminant.
  *
+ * @example AstGrepFilterConfig - For ast-grep pattern matching
  * @example JqFilterConfig - For JSON processing with jq
  * @example RegexFilterConfig - For regex pattern matching
  * @example XPathFilterConfig - For XML/HTML XPath queries
  * @example TsqFilterConfig - For tree-sitter AST queries
  */
 export type FilterConfig =
+  | AstGrepFilterConfig
   | JqFilterConfig
   | RegexFilterConfig
   | TsqFilterConfig

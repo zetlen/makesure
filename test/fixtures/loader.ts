@@ -40,6 +40,15 @@ export async function loadVersions(
  * Convenience function for common fixture patterns.
  */
 export const fixtures = {
+  // ast-grep reuses tsq fixtures since they work for both tools
+  astGrep: {
+    go: () => loadVersions('filters/tsq/go', 'handlers-v1.go', 'handlers-v2.go'),
+    java: () => loadVersions('filters/tsq/java', 'UserService-v1.java', 'UserService-v2.java'),
+    javascript: () => loadVersions('filters/tsq/javascript', 'utils-v1.js', 'utils-v2.js'),
+    python: () => loadVersions('filters/tsq/python', 'models-v1.py', 'models-v2.py'),
+    rust: () => loadVersions('filters/tsq/rust', 'lib-v1.rs', 'lib-v2.rs'),
+    typescript: () => loadVersions('filters/tsq/typescript', 'types-v1.ts', 'types-v2.ts'),
+  },
   jq: {
     package: () => loadVersions('filters/jq', 'package-v1.json', 'package-v2.json'),
   },
