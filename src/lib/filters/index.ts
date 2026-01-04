@@ -1,16 +1,20 @@
 import type {FileVersions} from '../diff/parser.js'
 import type {Filter, FilterResult} from './types.js'
 
+import {astGrepFilter, type AstGrepFilterConfig} from './ast-grep.js'
 import {jqFilter, type JqFilterConfig} from './jq.js'
 import {regexFilter, type RegexFilterConfig} from './regex.js'
 import {tsqFilter, type TsqFilterConfig} from './tsq.js'
 import {xpathFilter, type XPathFilterConfig} from './xpath.js'
 
 // Re-export individual filter config types
-export type {JqFilterConfig} from './jq.js'
+export type {AstGrepFilterConfig} from './ast-grep.js'
 // Re-export individual filters for direct access
-export {jqFilter} from './jq.js'
+export {astGrepFilter} from './ast-grep.js'
 // Re-export legacy function names for backwards compatibility
+export {applyAstGrepFilter} from './ast-grep.js'
+export type {JqFilterConfig} from './jq.js'
+export {jqFilter} from './jq.js'
 export {applyJqFilter} from './jq.js'
 export type {RegexFilterConfig} from './regex.js'
 
@@ -32,6 +36,7 @@ export {applyXpathFilter} from './xpath.js'
  * Each filter type has its own specific properties with the 'type' field as discriminant.
  */
 export type FilterConfig =
+  | AstGrepFilterConfig
   | JqFilterConfig
   | RegexFilterConfig
   | TsqFilterConfig
@@ -54,6 +59,15 @@ export async function applyFilter(
   // Handle legacy Filter format (with args array)
   if ('args' in filter && Array.isArray(filter.args)) {
     switch (filter.type) {
+      case 'ast-grep': {
+        return astGrepFilter.apply(versions, {
+          language: filter.args[1] as AstGrepFilterConfig['language'],
+          pattern: filter.args[0],
+          selector: filter.args[2],
+          type: 'ast-grep',
+        }, filePath)
+      }
+
       case 'jq': {
         return jqFilter.apply(versions, {query: filter.args[0], type: 'jq'})
       }
@@ -93,6 +107,10 @@ export async function applyFilter(
   // Handle new FilterConfig format (discriminated union)
   const config = filter as FilterConfig
   switch (config.type) {
+    case 'ast-grep': {
+      return astGrepFilter.apply(versions, config, filePath)
+    }
+
     case 'jq': {
       return jqFilter.apply(versions, config)
     }
