@@ -28,6 +28,7 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
+    "@ast-grep/cli": "^0.40.3",
     "@eslint/compat": "^1",
     "@oclif/prettier-config": "^0.2.1",
     "@oclif/test": "^4",
