@@ -40,7 +40,7 @@ async function processRule(rule: Rule, versions: FileVersions, filePath: string)
   let filterResult: FilterResult | null = null
   for (const filter of rule.filters) {
     // eslint-disable-next-line no-await-in-loop
-    filterResult = await applyFilter(filter, versions)
+    filterResult = await applyFilter(filter, versions, filePath)
     if (!filterResult) {
       return reports
     }

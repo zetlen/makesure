@@ -11,6 +11,9 @@ type SupportedFileFilterName =
   | "auto"
   | "jq"
   | "program"
+  | "regex"
+  | "tsq"
+  | "xpath"
   | "yq";
 
 /**
