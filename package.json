@@ -39,8 +39,10 @@
     "eslint": "^9",
     "eslint-config-oclif": "^6",
     "eslint-config-prettier": "^10",
+    "lefthook": "^2.0.13",
     "mocha": "^10",
     "oclif": "^4",
+    "prettier": "^3.7.4",
     "shx": "^0.3.3",
     "ts-json-schema-generator": "^2.4.0",
     "ts-node": "^10",
@@ -78,6 +80,7 @@
   "repository": "zetlen/makesure",
   "scripts": {
     "build": "shx rm -rf dist && tsc",
+    "format": "prettier --write",
     "generate-schema": "ts-json-schema-generator --path lib/configuration/config.ts --type MakesureConfig > makesure-schema.json",
     "lint": "eslint",
     "postpack": "shx rm -f oclif.manifest.json",
