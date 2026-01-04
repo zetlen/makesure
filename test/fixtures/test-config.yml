@@ -1,0 +1,17 @@
+rules:
+  - pattern: "package.json"
+    rules:
+      - actions:
+          - urgency: 1
+            template: |
+              # Test Report
+
+              Found changes in dependencies.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: "jq"
+            args:
+              - .dependencies

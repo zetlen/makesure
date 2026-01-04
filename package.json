@@ -10,7 +10,10 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
-    "gitdiff-parser": "^0.3.1"
+    "gitdiff-parser": "^0.3.1",
+    "handlebars": "^4.7.8",
+    "minimatch": "^10.1.1",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@eslint/compat": "^1",
@@ -61,7 +64,7 @@
   },
   "repository": "zetlen/makesure",
   "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
+    "build": "shx rm -rf dist && tsc",
     "generate-schema": "ts-json-schema-generator --path lib/configuration/config.ts --type MakesureConfig > makesure-schema.json",
     "lint": "eslint",
     "postpack": "shx rm -f oclif.manifest.json",

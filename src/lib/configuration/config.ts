@@ -8,10 +8,10 @@ type ReusableDefinition = {
 }
 
 type SupportedFileFilterName =
+  | "auto"
   | "jq"
-  | "yq"
   | "program"
-  | "auto";
+  | "yq";
 
 /**
  * A FileFilter will be run on each side of a file diff to produce artifacts for
@@ -20,19 +20,19 @@ type SupportedFileFilterName =
  */
 interface FileFilter extends ReusableDefinition {
   /**
-   * Type of filter to apply. "auto" will detect based on file extension.
-   */
-  type: SupportedFileFilterName;
-  /**
    * Args to pass to the filter or filter program.
    */
   args: string[];
+  /**
+   * Type of filter to apply. "auto" will detect based on file extension.
+   */
+  type: SupportedFileFilterName;
 }
 
 // Will be a union type soon!
 type Filter = FileFilter
 
-interface FilterResult {
+export interface FilterResult {
   diffText: string;
   left: {
     artifact: string;
@@ -49,14 +49,14 @@ interface FilterResult {
  */
 interface ReportAction extends ReusableDefinition {
   /**
-   * Urgency of report.
-   */
-  urgency: number;
-  /**
    * Handlebars template for the comment to produce. Accepts markdown,
    * and receives a FilterResult as its evaluation context.
    */
   template: string;
+  /**
+   * Urgency of report.
+   */
+  urgency: number;
 }
 
 /**
@@ -65,15 +65,15 @@ interface ReportAction extends ReusableDefinition {
  */
 interface RunAction extends ReusableDefinition {
   /**
-   * Path to the command. Can be a string or an array of strings which will be
-   * evaluated as arguments to produce the command path.
-   */
-  command: string | string[];
-  /**
    * If the command requires arguments, they can be evaluated here as Handlebars
    * templates which receive a FilterResult as evaluation context.
    */
   args: string[];
+  /**
+   * Path to the command. Can be a string or an array of strings which will be
+   * evaluated as arguments to produce the command path.
+   */
+  command: string | string[];
   /**
    * If the default environment variables don't suffice, you can define new ones
    * as Handlebars templates which receive a FilterResult as evaluation context.
