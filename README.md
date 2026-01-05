@@ -20,7 +20,7 @@ $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/1.0.0 linux-x64 node-v24.12.0
+@distill/cli/1.0.1 linux-x64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
@@ -64,7 +64,7 @@ EXAMPLES
   $ distill diff annotate main HEAD --repo ../other-project
 ```
 
-_See code: [src/commands/diff/annotate.ts](https://github.com/zetlen/distill/blob/v1.0.0/src/commands/diff/annotate.ts)_
+_See code: [src/commands/diff/annotate.ts](https://github.com/zetlen/distill/blob/v1.0.1/src/commands/diff/annotate.ts)_
 
 ## `distill help [COMMAND]`
 
