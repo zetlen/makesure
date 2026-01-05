@@ -1,61 +1,427 @@
 # yaml-language-server: $schema=./makesure-schema.json
 checksets:
+  # =============================================================================
+  # PACKAGE.JSON CHECKS
+  # =============================================================================
   - include: 'package.json'
     checks:
+      # Runtime dependencies (excluding frequently-updated ones)
       - actions:
-          - urgency: 0
+          - urgency: 2
             template: |
-              # A dependency has changed
+              # Runtime dependency changed
 
-              A dependency (besides the frequently-iterating "workerd" lib) has changed.
+              A runtime dependency has changed. Review for security and compatibility.
 
               ```diff
               {{diffText}}
               ```
         filters:
-          - type: 'jq'
+          - type: jq
             query: '.dependencies | del(.workerd)'
+
+      # Dev dependencies
+      - actions:
+          - urgency: 1
+            template: |
+              # Dev dependency changed
+
+              A development dependency has changed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: jq
+            query: '.devDependencies'
+
+      # NPM scripts
+      - actions:
+          - urgency: 2
+            template: |
+              # NPM scripts modified
+
+              Build/test scripts have changed. Ensure CI/CD pipelines are updated if needed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: jq
+            query: '.scripts'
+
+      # Node engine requirement
+      - actions:
+          - urgency: 3
+            template: |
+              # Node.js version requirement changed
+
+              The required Node.js version has changed. Update CI environments and documentation.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: jq
+            query: '.engines'
+
+      # oclif configuration
+      - actions:
+          - urgency: 2
+            template: |
+              # oclif CLI configuration changed
+
+              The oclif plugin/command configuration has changed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: jq
+            query: '.oclif'
+
+  # =============================================================================
+  # CLI COMMAND INTERFACE CHECKS
+  # =============================================================================
   - include: 'src/commands/**/*.ts'
     checks:
+      # Command arguments
       - actions:
-          - urgency: 0
+          - urgency: 3
             template: |
-              # Oclif command args have been modified.
+              # CLI command arguments modified
+
+              Command-line arguments have changed. This is a breaking change for users.
 
               ```diff
               {{diffText}}
               ```
         filters:
-          - type: 'ast-grep'
+          - type: ast-grep
             language: typescript
             pattern:
               selector: public_field_definition
               context: 'class C { static override args = $ARGS }'
+
+      # Command flags
       - actions:
-          - urgency: 0
+          - urgency: 3
             template: |
-              # Oclif command flags have been modified.
+              # CLI command flags modified
+
+              Command-line flags have changed. This may be a breaking change for users.
 
               ```diff
               {{diffText}}
               ```
         filters:
-          - type: 'ast-grep'
+          - type: ast-grep
             language: typescript
             pattern:
               selector: public_field_definition
               context: 'class C { static override flags = $FLAGS }'
+
+      # Command description
+      - actions:
+          - urgency: 1
+            template: |
+              # CLI command description updated
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: ast-grep
+            language: typescript
+            pattern:
+              selector: public_field_definition
+              context: 'class C { static override description = $DESC }'
+
+  # =============================================================================
+  # CONFIGURATION SCHEMA CHECKS
+  # =============================================================================
+  - include: 'src/lib/configuration/config.ts'
+    checks:
+      # FilterConfig union type - tracks when filter types are added/removed
+      - actions:
+          - urgency: 3
+            template: |
+              # FilterConfig type changed
+
+              The union of supported filter types has changed. Update documentation and schema.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: tsq
+            query: '(type_alias_declaration name: (type_identifier) @name (#eq? @name "FilterConfig")) @decl'
+            capture: decl
+
+      # MakesureConfig interface
+      - actions:
+          - urgency: 3
+            template: |
+              # MakesureConfig interface changed
+
+              The root configuration interface has changed. Regenerate schema with `npm run generate-schema`.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: tsq
+            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "MakesureConfig")) @decl'
+            capture: decl
+
+      # Check interface
+      - actions:
+          - urgency: 2
+            template: |
+              # Check interface changed
+
+              The Check interface has changed. This affects how rules are defined.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: tsq
+            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "Check")) @decl'
+            capture: decl
+
+      # FileCheckset interface
+      - actions:
+          - urgency: 2
+            template: |
+              # FileCheckset interface changed
+
+              The FileCheckset interface has changed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: tsq
+            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "FileCheckset")) @decl'
+            capture: decl
+
+  # =============================================================================
+  # FILTER IMPLEMENTATION CHECKS
+  # =============================================================================
+  - include: 'src/lib/filters/index.ts'
+    checks:
+      # Filter router switch statement
+      - actions:
+          - urgency: 2
+            template: |
+              # Filter routing logic changed
+
+              The applyFilter switch statement has changed. A filter may have been added or removed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: ast-grep
+            language: typescript
+            pattern: 'switch (config.type) { $$$CASES }'
+
+  - include: 'src/lib/filters/*.ts'
+    checks:
+      # Filter config type definitions
+      - actions:
+          - urgency: 2
+            template: |
+              # Filter config type changed
+
+              A filter's configuration type has been modified.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: tsq
+            query: '[(type_alias_declaration) @type (interface_declaration) @iface]'
+
+  # =============================================================================
+  # TYPESCRIPT CONFIGURATION
+  # =============================================================================
+  - include: 'tsconfig.json'
+    checks:
+      - actions:
+          - urgency: 2
+            template: |
+              # TypeScript compiler options changed
+
+              TypeScript configuration has changed. This may affect build output.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: jq
+            query: '.compilerOptions'
+
+  # =============================================================================
+  # DOCKER CONFIGURATION
+  # =============================================================================
+  - include: 'Dockerfile'
+    checks:
+      # Base image changes
+      - actions:
+          - urgency: 3
+            template: |
+              # Docker base image changed
+
+              The base image has changed. Verify compatibility and security.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: '^FROM .+$'
+
+      # Installed packages
+      - actions:
+          - urgency: 2
+            template: |
+              # Docker packages changed
+
+              System packages installed in the container have changed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: '^RUN apk add .+$'
+
+  # =============================================================================
+  # DEVELOPMENT TOOLING
+  # =============================================================================
+  - include: 'mise.toml'
+    checks:
+      - actions:
+          - urgency: 1
+            template: |
+              # Development tool versions changed
+
+              Tool versions in mise.toml have been updated.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: "\\[tools\\][\\s\\S]+"
+            flags: 's'
+
+  - include: 'lefthook.yml'
+    checks:
+      - actions:
+          - urgency: 2
+            template: |
+              # Git hooks configuration changed
+
+              Pre-commit or other git hooks have been modified.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: "pre-commit:[\\s\\S]+"
+            flags: 's'
+
+  # =============================================================================
+  # DOCUMENTATION
+  # =============================================================================
   - include: 'README.md'
     checks:
       - actions:
           - urgency: 1
             template: |
-              # Commands section of readme has changed.
+              # README commands section changed
+
+              The auto-generated commands documentation has been updated.
 
               ```diff
               {{diffText}}
               ```
         filters:
-          - type: 'regex'
-            pattern: "\\n<!-- commands -->.+\\n<!-- commandsstop -->"
+          - type: regex
+            pattern: '<!-- commands -->[\\s\\S]+<!-- commandsstop -->'
             flags: 's'
+
+      - actions:
+          - urgency: 1
+            template: |
+              # README usage section changed
+
+              The usage documentation has been updated.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: '<!-- usage -->[\\s\\S]+<!-- usagestop -->'
+            flags: 's'
+
+  - include: 'CLAUDE.md'
+    checks:
+      - actions:
+          - urgency: 0
+            template: |
+              # CLAUDE.md updated
+
+              AI assistant instructions have been modified.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: "## [\\s\\S]+"
+            flags: 's'
+
+  # =============================================================================
+  # TEST FIXTURES
+  # =============================================================================
+  - include: 'test/fixtures/**/*.yml'
+    checks:
+      - actions:
+          - urgency: 1
+            template: |
+              # Test fixture configuration changed
+
+              A YAML test fixture has been modified. Verify tests still pass.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: regex
+            pattern: '.*'
+            flags: 's'
+
+  # =============================================================================
+  # SCHEMA
+  # =============================================================================
+  - include: 'makesure-schema.json'
+    checks:
+      - actions:
+          - urgency: 1
+            template: |
+              # JSON Schema updated
+
+              The makesure configuration schema has changed.
+
+              ```diff
+              {{diffText}}
+              ```
+        filters:
+          - type: jq
+            query: '.definitions | keys'
