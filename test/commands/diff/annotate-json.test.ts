@@ -1,0 +1,16 @@
+import {runCommand} from '@oclif/test'
+import {expect} from 'chai'
+
+describe('diff:annotate JSON', () => {
+  it('outputs empty JSON array when no changes', async () => {
+    const {stdout} = await runCommand('diff:annotate HEAD HEAD --json')
+    const json = JSON.parse(stdout)
+    expect(json).to.be.an('array').that.is.empty
+  })
+
+  // Note: Testing actual changes is harder without setting up a real git repo with changes.
+  // For now, ensuring it returns valid JSON is a good start.
+  // We can try to rely on the current repo state if we want to test "with changes",
+  // but that depends on the environment.
+  // The existing test uses `HEAD HEAD` which is safe.
+})

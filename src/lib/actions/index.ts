@@ -7,8 +7,16 @@ export interface ReportAction {
   urgency: number
 }
 
+export interface ReportMetadata {
+  diffText: string
+  fileName: string
+  lineRange?: {end: number; start: number;}
+  message: string
+}
+
 export interface ReportOutput {
   content: string
+  metadata?: ReportMetadata
   urgency: number
 }
 
@@ -30,9 +38,39 @@ export function executeReportAction(
     right: {artifact: new Handlebars.SafeString(filterResult.right.artifact)},
   })
 
+  // Basic metadata population.
+  const lineRange = parseLineRange(filterResult.diffText)
+  const metadata: ReportMetadata = {
+    diffText: filterResult.diffText,
+    fileName: context.filePath,
+    message: content, // Use the rendered content as the default message
+    ...(lineRange ? {lineRange} : {}),
+  }
+
   return {
     content,
+    metadata,
     urgency: action.urgency,
+  }
+}
+
+/**
+ * Extract the line range from the first hunk header in the diff text.
+ * Hunk headers format: @@ -oldStart,oldLines +newStart,newLines @@
+ * We are interested in the new range (after the +).
+ */
+function parseLineRange(diffText: string): undefined | {end: number; start: number;} {
+  const match = diffText.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/m)
+  if (!match) {
+    return undefined
+  }
+
+  const start = Number.parseInt(match[1], 10)
+  const lines = match[2] ? Number.parseInt(match[2], 10) : 1
+
+  return {
+    end: start + lines - 1, // inclusive
+    start,
   }
 }
 

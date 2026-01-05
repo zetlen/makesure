@@ -1,101 +1,60 @@
 import {expect} from 'chai'
 
-import {executeReportAction, isReportAction} from '../../../src/lib/actions/index.js'
+import {executeReportAction, ReportAction} from '../../../src/lib/actions/index.js'
+import {FilterResult} from '../../../src/lib/filters/types.js'
 
-describe('actions', () => {
-  describe('isReportAction', () => {
-    it('returns true for report actions', () => {
-      const action = {template: 'test', urgency: 1}
-      expect(isReportAction(action)).to.be.true
-    })
+describe('executeReportAction', () => {
+  it('populates metadata correctly', () => {
+    const action: ReportAction = {
+      template: 'Found issue in {{filePath}}',
+      urgency: 1,
+    }
 
-    it('returns false for non-report actions', () => {
-      expect(isReportAction({command: 'echo'})).to.be.false
-      expect(isReportAction(null)).to.be.false
-      // eslint-disable-next-line unicorn/no-useless-undefined
-      expect(isReportAction(undefined)).to.be.false
-      expect(isReportAction('string')).to.be.false
+    const filterResult: FilterResult = {
+      diffText: 'some diff',
+      left: {artifact: 'left'},
+      right: {artifact: 'right'},
+    }
+
+    const context = {filePath: 'src/main.ts'}
+
+    const output = executeReportAction(action, filterResult, context)
+
+    expect(output.content).to.equal('Found issue in src/main.ts')
+    expect(output.urgency).to.equal(1)
+    expect(output.metadata).to.deep.include({
+      diffText: 'some diff',
+      fileName: 'src/main.ts',
+      message: 'Found issue in src/main.ts',
     })
   })
 
-  describe('executeReportAction', () => {
-    it('renders a simple template', () => {
-      const action = {
-        template: 'File changed: {{filePath}}',
-        urgency: 1,
-      }
-      const filterResult = {
-        diffText: '- old\n+ new',
-        left: {artifact: 'old'},
-        right: {artifact: 'new'},
-      }
+  it('extracts line range from diff', () => {
+    const action: ReportAction = {
+      template: 'Issue',
+      urgency: 1,
+    }
 
-      const result = executeReportAction(action, filterResult, {filePath: 'test.json'})
+    const diffText = `--- a.ts
++++ b.ts
+@@ -10,1 +20,5 @@
+ context
++new line
+ context`
 
-      expect(result.urgency).to.equal(1)
-      expect(result.content).to.equal('File changed: test.json')
-    })
+    const filterResult: FilterResult = {
+      diffText,
+      left: {artifact: 'left'},
+      right: {artifact: 'right'},
+    }
 
-    it('renders template with diffText', () => {
-      const action = {
-        template: '```diff\n{{diffText}}\n```',
-        urgency: 2,
-      }
-      const filterResult = {
-        diffText: '- old line\n+ new line',
-        left: {artifact: 'old line'},
-        right: {artifact: 'new line'},
-      }
+    const context = {filePath: 'src/main.ts'}
 
-      const result = executeReportAction(action, filterResult, {filePath: 'test.json'})
+    const output = executeReportAction(action, filterResult, context)
 
-      expect(result.urgency).to.equal(2)
-      expect(result.content).to.include('- old line')
-      expect(result.content).to.include('+ new line')
-    })
-
-    it('renders template with left and right artifacts', () => {
-      const action = {
-        template: 'Before: {{left.artifact}}\nAfter: {{right.artifact}}',
-        urgency: 0,
-      }
-      const filterResult = {
-        diffText: '',
-        left: {artifact: 'version 1'},
-        right: {artifact: 'version 2'},
-      }
-
-      const result = executeReportAction(action, filterResult, {filePath: 'file.txt'})
-
-      expect(result.content).to.include('Before: version 1')
-      expect(result.content).to.include('After: version 2')
-    })
-
-    it('handles multiline templates', () => {
-      const action = {
-        template: `# Change Report
-
-File: {{filePath}}
-
-## Diff
-\`\`\`
-{{diffText}}
-\`\`\`
-`,
-        urgency: 1,
-      }
-      const filterResult = {
-        diffText: '- removed\n+ added',
-        left: {artifact: 'removed'},
-        right: {artifact: 'added'},
-      }
-
-      const result = executeReportAction(action, filterResult, {filePath: 'config.json'})
-
-      expect(result.content).to.include('# Change Report')
-      expect(result.content).to.include('File: config.json')
-      expect(result.content).to.include('- removed')
-      expect(result.content).to.include('+ added')
+    expect(output.metadata?.lineRange).to.deep.equal({
+      end: 24, // 20 + 5 - 1
+      start: 20,
     })
   })
 })

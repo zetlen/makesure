@@ -39,6 +39,10 @@ export default class DiffAnnotate extends Command {
       char: 'c',
       description: 'Path to the distill configuration file (default: distill.yml in repo root)',
     }),
+    json: Flags.boolean({
+      description:
+        'Output reports in JSON format. Note: "lineRange" in metadata is relative to the filtered artifact, not necessarily the original source file. For some filters (like jq/xpath), exact source line mapping may be approximate.',
+    }),
     repo: Flags.string({
       char: 'r',
       defaultHelp: 'Find the closest top-level git repo to the current directory',
@@ -64,14 +68,24 @@ export default class DiffAnnotate extends Command {
     // Generate diff using git
     const diffText = await this.getGitDiff(args.base, args.head, repoPath)
     if (!diffText.trim()) {
-      this.log('No changes between %s and %s', args.base, args.head)
+      if (flags.json) {
+        this.log('[]')
+      } else {
+        this.log('No changes between %s and %s', args.base, args.head)
+      }
+
       return
     }
 
     // Parse the diff
     const {files} = parseDiff(diffText)
     if (files.length === 0) {
-      this.log('No files found in diff')
+      if (flags.json) {
+        this.log('[]')
+      } else {
+        this.log('No files found in diff')
+      }
+
       return
     }
 
@@ -83,8 +97,21 @@ export default class DiffAnnotate extends Command {
 
     // Output reports sorted by urgency (highest first)
     reports.sort((a, b) => b.urgency - a.urgency)
-    for (const report of reports) {
-      this.log(report.content)
+
+    if (flags.json) {
+      const jsonReports = reports.map(
+        (report) =>
+          report.metadata || {
+            diffText: '',
+            fileName: '', // Fallback if metadata is missing (should not happen with updated actions)
+            message: report.content,
+          },
+      )
+      this.log(JSON.stringify(jsonReports, null, 2))
+    } else {
+      for (const report of reports) {
+        this.log(report.content)
+      }
     }
   }
 
