@@ -36,9 +36,6 @@ export default class AnnotateDiff extends Command {
     '<%= config.bin %> <%= command.id %> main HEAD --repo ../other-project',
   ]
   static override flags = {
-    color: Flags.boolean({
-      description: 'Syntax highlight output diffs',
-    }),
     config: Flags.string({
       char: 'c',
       description: 'Path to the distill configuration file (default: distill.yml in repo root)',
