@@ -84,7 +84,7 @@
   "scripts": {
     "build": "shx rm -rf dist && tsc",
     "build:docker": "docker buildx build -t zetlen/distill:edge --platform linux/amd64 .",
-    "dogfood": "npm run build && ./bin/run.js annotate:diff HEAD .",
+    "dogfood": "npm run build && ./bin/run.js annotate diff HEAD .",
     "format": "prettier --write",
     "generate-schema": "ts-json-schema-generator --no-type-check --path lib/configuration/config.ts --type DistillConfig -o distill-schema.json",
     "lint": "eslint",

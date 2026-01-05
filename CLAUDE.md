@@ -21,13 +21,22 @@ npm run build
 npm test
 
 # Run a single test file
-mocha --forbid-only "test/commands/diff/annotate.test.ts"
+mocha --forbid-only "test/commands/annotate/diff.test.ts"
 
 # Lint the code
 npm run lint
 
 # Generate JSON schema from TypeScript config types
 npm run generate-schema
+
+# Run distill on itself (dogfooding) - tests the tool on the current repo
+npm run dogfood
+
+# Format code with prettier
+npm run format <files>
+
+# Build Docker image
+npm run build:docker
 ```
 
 ### Running the CLI
@@ -40,8 +49,11 @@ npm run generate-schema
 ./bin/run.js <command>
 
 # Main usage: compare two commits
-./bin/run.js diff:annotate HEAD~1 HEAD
-./bin/run.js diff:annotate main feat/foo --config ./custom-rules.yml
+./bin/run.js annotate diff HEAD~1 HEAD
+./bin/run.js annotate diff main feat/foo --config ./custom-rules.yml
+
+# Output as JSON (includes metadata with lineRange and symbolic context)
+./bin/run.js annotate diff HEAD~1 HEAD --json
 ```
 
 ## Architecture
@@ -54,7 +66,9 @@ The core of distill is a rule-based configuration system defined in `src/lib/con
 - **Check**: Contains filters and actions to apply to matching files
 - **Filter**: Processes files to extract relevant content for comparison
   - Filters run on both sides of a diff to produce artifacts A and B
-  - Returns a `FilterResult` containing the diff text and both artifacts
+  - Returns a `FilterResult` containing the diff text, both artifacts, and optional metadata:
+    - `lineRange`: Line numbers within the filtered artifact (for precise code location)
+    - `context`: Symbolic context array (e.g., surrounding class/function names for ast-grep, tsq, regex)
 - **Action**: What to do when a check triggers
   - **ReportAction**: Generates text reports using Handlebars templates with markdown support
   - **RunAction**: Executes arbitrary commands with environment variables from the filter results
@@ -121,17 +135,49 @@ checksets:
             template: 'Section changed'
 ```
 
+### JSON Output Format
+
+The `--json` flag outputs structured report data with enhanced metadata:
+
+```typescript
+{
+  content: string      // Rendered markdown report
+  urgency: number      // Priority level (0-3)
+  metadata: {
+    fileName: string
+    diffText: string
+    message: string
+    lineRange?: {      // Line numbers in the filtered artifact
+      start: number
+      end: number
+    }
+    context?: Array<{  // Symbolic context (class, function names, etc.)
+      name: string
+      type: string     // e.g., "class_declaration", "function_definition"
+    }>
+  }
+}
+```
+
+**Important**: The `lineRange` refers to line numbers within the *filtered artifact* (the extracted code snippet), not the original source file. This is especially relevant for filters like `jq` or `xpath` that transform the input.
+
+The `context` array provides symbolic information about surrounding code structures (available for ast-grep, tsq, and regex filters), helping identify which class/function the change occurred in.
+
 ### Project Structure
 
 - `src/index.ts`: Re-exports oclif's run function (standard oclif entry point)
 - `src/commands/`: Command implementations
-  - `diff/annotate.ts`: Main command that compares commits and applies rules
+  - `annotate/diff.ts`: Main command that compares commits and applies rules
 - `src/lib/`: Core library modules
   - `configuration/`: Config types (`config.ts`) and YAML loader (`loader.ts`)
-  - `diff/`: Git diff parsing and file version retrieval
+  - `diff/`: Git diff parsing and file version retrieval (`parser.ts`)
   - `filters/`: Filter implementations (jq, regex, xpath, tsq, ast-grep)
-  - `actions/`: Action implementations (report with Handlebars)
+    - `types.ts`: FilterResult interface with lineRange and context metadata
+    - `utils.ts`: Shared utilities for extracting symbolic context
+  - `actions/`: Action implementations (report with Handlebars, JSON output)
+  - `tree-sitter.ts`: Tree-sitter language parsers and utilities
 - `test/`: Mocha/Chai tests using `@oclif/test`
+  - `test/commands/annotate/`: Command tests (diff.test.ts, diff-json.test.ts)
   - `test/lib/filters/`: Individual test files per filter type
   - `test/fixtures/`: Test fixture files for various languages
 - `bin/`: CLI executables (`dev.js` for development, `run.js` for production)
@@ -160,3 +206,45 @@ The following CLI tools must be installed for full functionality:
 - `ast-grep` - for the ast-grep filter
 
 These are managed via `mise.toml` for local development. In Docker, they're installed via `apk`.
+
+### Development Conventions
+
+#### Code Quality
+
+- **Git Hooks**: Lefthook runs pre-commit hooks for formatting and linting
+  - Auto-formats staged files with prettier
+  - Runs ESLint with auto-fix on staged TypeScript files
+  - Validates commit messages with commitlint (conventional commits)
+- **Linting**: ESLint with oclif and prettier configs
+- **Formatting**: Prettier with plugins for shell scripts and TOML
+- **Tests**: Run with `--forbid-only` to prevent committed `.only()` calls
+
+#### Workflow Tips
+
+- **Schema Generation**: After changing config types in `src/lib/configuration/config.ts`, run `npm run generate-schema` to update `distill-schema.json`
+- **README Updates**: The README command documentation is auto-generated by oclif during `npm run prepack` or when running `npm run version`
+- **Dogfooding**: Run `npm run dogfood` to test distill on itself using the `distill.yml` in the repo root
+- **Self-Documentation**: The `distill.yml` file serves as both configuration for the project and a comprehensive example of all filter types
+
+#### Key Files to Update Together
+
+When making changes, these files often need to be updated together:
+
+1. **Adding a new filter**:
+   - `src/lib/filters/<name>.ts` - Implementation
+   - `src/lib/filters/index.ts` - Add to router switch statement
+   - `src/lib/configuration/config.ts` - Add to FilterConfig union type
+   - Run `npm run generate-schema` to update schema
+   - `test/lib/filters/filter-<name>.test.ts` - Add tests
+   - `CLAUDE.md` - Update filter table and examples
+
+2. **Changing command interface**:
+   - `src/commands/**/*.ts` - Update args/flags
+   - Run `npm run prepack` to update README
+   - Update examples in command description
+
+3. **Modifying configuration schema**:
+   - `src/lib/configuration/config.ts` - Update types
+   - Run `npm run generate-schema`
+   - Update `distill.yml` if needed
+   - Update documentation and examples
