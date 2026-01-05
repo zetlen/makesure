@@ -13,7 +13,7 @@ import {applyFilter, type FilterResult} from '../../lib/filters/index.js'
 
 const execFileAsync = promisify(execFile)
 
-export default class DiffAnnotate extends Command {
+export default class AnnotateDiff extends Command {
   static override args = {
     base: Args.string({
       description: 'Base commit-ish (e.g., HEAD~1, main, a1b2c3d)',
@@ -36,9 +36,6 @@ export default class DiffAnnotate extends Command {
     '<%= config.bin %> <%= command.id %> main HEAD --repo ../other-project',
   ]
   static override flags = {
-    color: Flags.boolean({
-      description: 'Syntax highlight output diffs',
-    }),
     config: Flags.string({
       char: 'c',
       description: 'Path to the distill configuration file (default: distill.yml in repo root)',
@@ -55,7 +52,7 @@ export default class DiffAnnotate extends Command {
   }
 
   public async run(): Promise<void> {
-    const {args, flags} = await this.parse(DiffAnnotate)
+    const {args, flags} = await this.parse(AnnotateDiff)
 
     // Resolve repository path
     const repoPath = flags.repo ? resolve(process.cwd(), flags.repo) : await this.getGitToplevel(process.cwd())
