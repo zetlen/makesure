@@ -7,36 +7,32 @@ Process code changes with semantic rules
 [![Downloads/week](https://img.shields.io/npm/dw/distill.svg)](https://npmjs.org/package/distill)
 
 <!-- toc -->
-
-- [distill](#distill)
-- [Usage](#usage)
-- [Commands](#commands)
+* [distill](#distill)
+* [Usage](#usage)
+* [Commands](#commands)
 <!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
-
 ```sh-session
 $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/0.0.0 darwin-arm64 node-v24.12.0
+@distill/cli/1.0.0 linux-x64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
 ...
 ```
-
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
-
-- [`distill diff annotate BASE HEAD`](#distill-diff-annotate-base-head)
-- [`distill help [COMMAND]`](#distill-help-command)
+* [`distill diff annotate BASE HEAD`](#distill-diff-annotate-base-head)
+* [`distill help [COMMAND]`](#distill-help-command)
 
 ## `distill diff annotate BASE HEAD`
 
@@ -68,7 +64,7 @@ EXAMPLES
   $ distill diff annotate main HEAD --repo ../other-project
 ```
 
-_See code: [src/commands/diff/annotate.ts](https://github.com/zetlen/distill/blob/v0.0.0/src/commands/diff/annotate.ts)_
+_See code: [src/commands/diff/annotate.ts](https://github.com/zetlen/distill/blob/v1.0.0/src/commands/diff/annotate.ts)_
 
 ## `distill help [COMMAND]`
 
@@ -89,5 +85,4 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.36/src/commands/help.ts)_
-
 <!-- commandsstop -->
