@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/zetlen/distill/compare/cli-v1.0.1...cli-v1.0.2) (2026-01-05)
+
+
+### Bug Fixes
+
+* use multi-stage Docker build for smaller image ([#9](https://github.com/zetlen/distill/issues/9)) ([fd08f77](https://github.com/zetlen/distill/commit/fd08f775aa0e9eed9d789057c2ac0e9f8cc2c3bb))
+
 ## [1.0.1](https://github.com/zetlen/distill/compare/cli-v1.0.0...cli-v1.0.1) (2026-01-05)
 
 
