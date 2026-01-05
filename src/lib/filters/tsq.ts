@@ -130,25 +130,50 @@ export const tsqFilter: FilterApplier<TsqFilterConfig> = {
         const seen = new Set<number>()
 
         for (const match of matches) {
-          // A match contains multiple captures.
-          // We want to extract the text for nodes that match the 'capture' config (if set),
-          // OR all nodes if no capture config is set.
-          // AND we want to return the whole match as "context".
+          const {captures} = match
 
-          const matchContext: Record<string, string> = {}
-          let hasMatchingCapture = false
+          // 1. Determine which captures are "content" (to be extracted as text)
+          // Rules:
+          // A. If config.capture is set, only captures with that name are content.
+          // B. If config.capture is NOT set, only "maximal" captures are content (filters out nested captures).
+          const contentCaptures = capture
+            ? captures.filter((c) => c.name === capture)
+            : captures.filter(
+                (c) =>
+                  !captures.some(
+                    (other) =>
+                      other !== c &&
+                      other.node.startIndex <= c.node.startIndex &&
+                      other.node.endIndex >= c.node.endIndex &&
+                      (other.node.startIndex < c.node.startIndex || other.node.endIndex > c.node.endIndex),
+                  ),
+              )
 
-          for (const cap of match.captures) {
-            matchContext[cap.name] = cap.node.text
-
-            if ((!capture || cap.name === capture) && !seen.has(cap.node.id)) {
-              seen.add(cap.node.id)
-              nodeTexts.push(cap.node.text)
-              hasMatchingCapture = true
+          // 2. Add content to nodeTexts
+          for (const c of contentCaptures) {
+            if (!seen.has(c.node.id)) {
+              seen.add(c.node.id)
+              nodeTexts.push(c.node.text)
             }
           }
 
-          if (hasMatchingCapture) {
+          // 3. Context is everything else
+          // We exclude the captured content itself from the context to avoid redundancy/noise
+          const matchContext: Record<string, string> = {}
+          let hasContext = false
+
+          for (const c of captures) {
+            // Check if this capture is one of the content captures
+            const isContent = contentCaptures.includes(c)
+
+            // Only add to context if it's NOT the primary content being diffed
+            if (!isContent) {
+              matchContext[c.name] = c.node.text
+              hasContext = true
+            }
+          }
+
+          if (hasContext) {
             contexts.push(matchContext)
           }
         }
