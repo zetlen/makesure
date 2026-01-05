@@ -1,9 +1,9 @@
 import {runCommand} from '@oclif/test'
 import {expect} from 'chai'
 
-describe('diff:annotate JSON', () => {
+describe('annotate:diff JSON', () => {
   it('outputs empty JSON array when no changes', async () => {
-    const {stdout} = await runCommand('diff:annotate HEAD HEAD --json')
+    const {stdout} = await runCommand('annotate:diff HEAD HEAD --json')
     const json = JSON.parse(stdout)
     expect(json).to.be.an('array').that.is.empty
   })
