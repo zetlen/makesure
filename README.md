@@ -44,7 +44,7 @@ Annotate a git diff with semantic analysis based on configured rules
 
 ```
 USAGE
-  $ distill diff annotate BASE HEAD [-c <value>] [-r <value>]
+  $ distill diff annotate BASE HEAD [--color] [-c <value>] [-r <value>]
 
 ARGUMENTS
   BASE  Base commit-ish (e.g., HEAD~1, main, a1b2c3d)
@@ -52,7 +52,8 @@ ARGUMENTS
 
 FLAGS
   -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
-  -r, --repo=<value>    Path to the git repository (default: toplevel of current directory)
+  -r, --repo=<value>    Path to git repository
+      --color           Syntax highlight output diffs
 
 DESCRIPTION
   Annotate a git diff with semantic analysis based on configured rules
