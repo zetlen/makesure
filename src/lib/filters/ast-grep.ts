@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process'
 import type {FileVersions} from '../diff/parser.js'
 import type {FilterApplier, FilterResult} from './types.js'
 
-import {createFilterResult} from './utils.js'
+import {processFilter} from './utils.js'
 
 /**
  * Pattern object for ast-grep with context and selector.
@@ -149,17 +149,62 @@ rule:
 /**
  * Extract matched text from ast-grep JSON output.
  */
-function extractMatchedText(jsonOutput: string): string {
+interface AstGrepMatch {
+  metaVariables?: {
+    multi?: Record<string, {text: string}>
+    single?: Record<string, {text: string}>
+    transformed?: Record<string, {text: string}>
+  }
+  text: string
+}
+
+/**
+ * Extract matched text and context from ast-grep JSON output.
+ */
+function extractMatchedText(jsonOutput: string): {context: Record<string, string>[][]; text: string} {
   if (!jsonOutput.trim()) {
-    return ''
+    return {context: [], text: ''}
   }
 
   try {
-    const matches = JSON.parse(jsonOutput) as Array<{text: string}>
-    return matches.map((m) => m.text).join('\n\n')
+    const matches = JSON.parse(jsonOutput) as AstGrepMatch[]
+    const text = matches.map((m) => m.text).join('\n\n')
+
+    // Extract meta-variables as context
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const contexts: Record<string, any>[] = []
+
+    for (const match of matches) {
+      if (match.metaVariables) {
+        const context: Record<string, string> = {}
+
+        // Helper to merge variables
+
+        const extractVars = (vars?: Record<string, {text: string}>) => {
+          if (!vars) return
+          for (const [key, value] of Object.entries(vars)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            context[key] = (value as any).text
+          }
+        }
+
+        extractVars(match.metaVariables.single)
+        extractVars(match.metaVariables.multi)
+        extractVars(match.metaVariables.transformed)
+
+        if (Object.keys(context).length > 0) {
+          contexts.push(context)
+        }
+      }
+    }
+
+    return {
+      context: [contexts],
+      text,
+    }
   } catch {
-    // If parsing fails, return empty string
-    return ''
+    // If parsing fails, return empty
+    return {context: [], text: ''}
   }
 }
 
@@ -176,8 +221,10 @@ export const astGrepFilter: FilterApplier<AstGrepFilterConfig> = {
       throw new Error('ast-grep filter requires a language to be specified')
     }
 
-    const extractNodes = async (content: null | string): Promise<string> => {
-      if (!content) return ''
+    const extractNodes = async (
+      content: null | string,
+    ): Promise<{context: Record<string, string>[][]; text: string}> => {
+      if (!content) return {context: [], text: ''}
 
       let args: string[]
 
@@ -194,16 +241,6 @@ export const astGrepFilter: FilterApplier<AstGrepFilterConfig> = {
       return extractMatchedText(jsonOutput)
     }
 
-    // If both are null, nothing to filter
-    if (versions.oldContent === null && versions.newContent === null) {
-      return null
-    }
-
-    const [leftArtifact, rightArtifact] = await Promise.all([
-      extractNodes(versions.oldContent),
-      extractNodes(versions.newContent),
-    ])
-
-    return createFilterResult(leftArtifact, rightArtifact)
+    return processFilter(versions, extractNodes)
   },
 }

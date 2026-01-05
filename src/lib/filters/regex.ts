@@ -1,7 +1,7 @@
 import type {FileVersions} from '../diff/parser.js'
 import type {FilterApplier, FilterResult} from './types.js'
 
-import {createFilterResult} from './utils.js'
+import {processFilter} from './utils.js'
 
 /**
  * Configuration for the regex filter.
@@ -64,21 +64,31 @@ export const regexFilter: FilterApplier<RegexFilterConfig> = {
     const effectiveFlags = flags.includes('g') ? flags : `${flags}gm`
     const regex = new RegExp(pattern, effectiveFlags)
 
-    const extractMatches = (content: null | string): string => {
-      if (!content) return ''
-      const matches = content.match(regex)
-      return matches ? matches.join('\n') : ''
+    const extractMatches = (content: null | string): {context: Record<string, string>[][]; text: string} => {
+      if (!content) return {context: [], text: ''}
+
+      const matches = [...content.matchAll(regex)]
+      if (matches.length === 0) return {context: [], text: ''}
+
+      const text = matches.map((m) => m[0]).join('\n')
+
+      // Extract groups from each match
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const contexts: Record<string, any>[] = []
+
+      for (const match of matches) {
+        if (match.groups) {
+          contexts.push({...match.groups})
+        }
+      }
+
+      return {
+        context: [contexts],
+        text,
+      }
     }
 
-    // If both are null, nothing to filter
-    if (versions.oldContent === null && versions.newContent === null) {
-      return null
-    }
-
-    const leftArtifact = extractMatches(versions.oldContent)
-    const rightArtifact = extractMatches(versions.newContent)
-
-    return createFilterResult(leftArtifact, rightArtifact)
+    return processFilter(versions, extractMatches)
   },
 }
 

@@ -7,40 +7,44 @@ Process code changes with semantic rules
 [![Downloads/week](https://img.shields.io/npm/dw/distill.svg)](https://npmjs.org/package/distill)
 
 <!-- toc -->
-* [distill](#distill)
-* [Usage](#usage)
-* [Commands](#commands)
+
+- [distill](#distill)
+- [Usage](#usage)
+- [Commands](#commands)
 <!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
+
 ```sh-session
 $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/1.0.2 linux-x64 node-v24.12.0
+@distill/cli/1.0.2 darwin-arm64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
 ...
 ```
+
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
-* [`distill diff annotate BASE HEAD`](#distill-diff-annotate-base-head)
-* [`distill help [COMMAND]`](#distill-help-command)
+
+- [`distill diff annotate BASE HEAD`](#distill-diff-annotate-base-head)
+- [`distill help [COMMAND]`](#distill-help-command)
 
 ## `distill diff annotate BASE HEAD`
 
-Annotate a git diff with semantic analysis based on configured rules
+Annotate a git diff with semantic analysis based on configured rules.
 
 ```
 USAGE
-  $ distill diff annotate BASE HEAD [--color] [-c <value>] [-r <value>]
+  $ distill diff annotate BASE HEAD [--color] [-c <value>] [--json] [-r <value>]
 
 ARGUMENTS
   BASE  Base commit-ish (e.g., HEAD~1, main, a1b2c3d)
@@ -50,9 +54,17 @@ FLAGS
   -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
   -r, --repo=<value>    Path to git repository
       --color           Syntax highlight output diffs
+      --json            Output reports in JSON format. Note: "lineRange" in metadata is relative to the filtered
+                        artifact, not necessarily the original source file. For some filters (like jq/xpath), exact
+                        source line mapping may be approximate.
 
 DESCRIPTION
-  Annotate a git diff with semantic analysis based on configured rules
+  Annotate a git diff with semantic analysis based on configured rules.
+
+  When using --json, a "lineRange" field is included. Note that this range refers to the line numbers within the
+  *filtered artifact* (the code snippet shown in the report), NOT the original source file.
+
+  Future versions may map these back to original source lines for supported filters (ast-grep, tsq, xpath).
 
 EXAMPLES
   $ distill diff annotate HEAD~1 HEAD
@@ -85,4 +97,5 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.36/src/commands/help.ts)_
+
 <!-- commandsstop -->

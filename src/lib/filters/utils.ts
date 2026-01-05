@@ -4,7 +4,16 @@ import {unlink, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 
+import type {FileVersions} from '../diff/parser.js'
 import type {FilterResult} from './types.js'
+
+export interface ExtractedContent {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: Record<string, any>[][]
+  text: string
+}
+
+export type Extractor = (content: null | string) => ExtractedContent | Promise<ExtractedContent>
 
 /**
  * Run a command with stdin input and return stdout.
@@ -124,4 +133,32 @@ export async function createFilterResult(
     right: {artifact: rightArtifact},
     ...(lineRange ? {lineRange} : {}),
   }
+}
+
+/**
+ * Helper to process filter application with common logic for extraction and context merging.
+ */
+export async function processFilter(versions: FileVersions, extractor: Extractor): Promise<FilterResult | null> {
+  if (versions.oldContent === null && versions.newContent === null) {
+    return null
+  }
+
+  const [left, right] = await Promise.all([
+    Promise.resolve(extractor(versions.oldContent)),
+    Promise.resolve(extractor(versions.newContent)),
+  ])
+
+  // Combine contexts from both sides
+  const allContexts = new Set<string>()
+  for (const c of left.context) allContexts.add(JSON.stringify(c))
+  for (const c of right.context) allContexts.add(JSON.stringify(c))
+
+  const result = await createFilterResult(left.text, right.text)
+
+  if (result && allContexts.size > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result.context = [...allContexts].map((c) => JSON.parse(c) as any)
+  }
+
+  return result
 }

@@ -225,7 +225,7 @@ checksets:
         filters:
           - type: ast-grep
             language: typescript
-            pattern: 'switch (config.type) { $$$CASES }'
+            pattern: 'switch ($CONFIG.type) { $$$CASES }'
 
   - include: 'src/lib/filters/*.ts'
     checks:
@@ -242,7 +242,7 @@ checksets:
               ```
         filters:
           - type: tsq
-            query: '[(type_alias_declaration) @type (interface_declaration) @iface]'
+            query: '[(type_alias_declaration name: (type_identifier) @name) @type (interface_declaration name: (type_identifier) @name) @iface]'
 
   # =============================================================================
   # TYPESCRIPT CONFIGURATION
@@ -281,7 +281,7 @@ checksets:
               ```
         filters:
           - type: regex
-            pattern: '^FROM .+$'
+            pattern: '^FROM (?<base_image>.+)$'
 
       # Installed packages
       - actions:
@@ -296,7 +296,7 @@ checksets:
               ```
         filters:
           - type: regex
-            pattern: '^RUN apk add .+$'
+            pattern: '^RUN apk add (?<packages>.+)$'
 
   # =============================================================================
   # DEVELOPMENT TOOLING

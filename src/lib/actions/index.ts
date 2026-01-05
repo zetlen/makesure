@@ -8,6 +8,8 @@ export interface ReportAction {
 }
 
 export interface ReportMetadata {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context?: Record<string, any>[]
   diffText: string
   fileName: string
   lineRange?: {end: number; start: number}
@@ -44,6 +46,7 @@ export function executeReportAction(
     fileName: context.filePath,
     message: content, // Use the rendered content as the default message
     ...(filterResult.lineRange ? {lineRange: filterResult.lineRange} : {}),
+    ...(filterResult.context ? {context: filterResult.context} : {}),
   }
 
   return {

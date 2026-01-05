@@ -5,6 +5,8 @@ import type {FileVersions} from '../diff/parser.js'
  * Contains the diff text and the artifacts from both sides.
  */
 export interface FilterResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context?: Record<string, any>[]
   diffText: string
   left: {
     artifact: string
