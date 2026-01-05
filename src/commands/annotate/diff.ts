@@ -1,15 +1,12 @@
 import {Args, Command, Flags} from '@oclif/core'
-import {minimatch} from 'minimatch'
 import {execFile} from 'node:child_process'
 import {join, resolve} from 'node:path'
 import {promisify} from 'node:util'
 
-import type {Check, DistillConfig, FileCheckset} from '../../lib/configuration/config.js'
-
-import {executeReportAction, isReportAction, type ReportOutput} from '../../lib/actions/index.js'
 import {loadConfig} from '../../lib/configuration/loader.js'
-import {type File, type FileVersions, getFileVersions, parseDiff, type RefPair} from '../../lib/diff/parser.js'
-import {applyFilter, type FilterResult} from '../../lib/filters/index.js'
+import {parseDiff, type RefPair} from '../../lib/diff/parser.js'
+import {processFiles} from '../../lib/processing/runner.js'
+import {type ContentProvider} from '../../lib/processing/types.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -94,7 +91,22 @@ export default class AnnotateDiff extends Command {
 
     // Process all files and collect reports
     const refs: RefPair = {base: args.base, head: args.head}
-    const reports = await this.processFiles(files, config, refs, repoPath)
+
+    // Create a content provider backed by git show
+    const contentProvider: ContentProvider = async (ref, path) => {
+      try {
+        const {stdout} = await execFileAsync('git', ['show', `${ref}:${path}`], {cwd: repoPath})
+        return stdout
+      } catch (error) {
+        this.debug('failed to fetch file content', {error, path, ref})
+        return null
+      }
+    }
+
+    const reports = await processFiles(files, config, {
+      contentProvider,
+      refs,
+    })
 
     // Output reports sorted by urgency (highest first)
     reports.sort((a, b) => b.urgency - a.urgency)
@@ -124,72 +136,5 @@ export default class AnnotateDiff extends Command {
   private async getGitToplevel(cwd: string): Promise<string> {
     const {stdout} = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {cwd})
     return stdout.trim()
-  }
-
-  private async processFiles(
-    files: File[],
-    config: DistillConfig,
-    refs: RefPair,
-    cwd: string,
-  ): Promise<ReportOutput[]> {
-    const reports: ReportOutput[] = []
-
-    for (const file of files) {
-      for (const checkset of config.checksets) {
-        // eslint-disable-next-line no-await-in-loop
-        const rulesetReports = await this.processRuleset(checkset as FileCheckset, file, refs, cwd)
-        reports.push(...rulesetReports)
-      }
-    }
-
-    return reports
-  }
-
-  private async processRule(rule: Check, versions: FileVersions, filePath: string): Promise<ReportOutput[]> {
-    const reports: ReportOutput[] = []
-    this.debug('processing rule on file %s', filePath, rule)
-
-    // Apply filters
-    let filterResult: FilterResult | null = null
-    for (const filter of rule.filters) {
-      // eslint-disable-next-line no-await-in-loop
-      filterResult = await applyFilter(filter, versions, filePath)
-      if (!filterResult) {
-        return reports
-      }
-    }
-
-    // Execute actions if we have a filter result
-    if (filterResult) {
-      for (const action of rule.actions) {
-        if (isReportAction(action)) {
-          const report = executeReportAction(action, filterResult, {filePath})
-          reports.push(report)
-        }
-      }
-    }
-
-    return reports
-  }
-
-  private async processRuleset(ruleset: FileCheckset, file: File, refs: RefPair, cwd: string): Promise<ReportOutput[]> {
-    const filePath = file.newPath || file.oldPath
-
-    if (!minimatch(filePath, ruleset.include)) {
-      return []
-    }
-
-    this.debug('processing ruleset on filepath %s', filePath, ruleset)
-
-    const versions = await getFileVersions(file, refs, cwd)
-    const reports: ReportOutput[] = []
-
-    for (const rule of ruleset.checks) {
-      // eslint-disable-next-line no-await-in-loop
-      const ruleReports = await this.processRule(rule, versions, filePath)
-      reports.push(...ruleReports)
-    }
-
-    return reports
   }
 }

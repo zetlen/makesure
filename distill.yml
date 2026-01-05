@@ -85,6 +85,31 @@ checksets:
   # =============================================================================
   - include: 'src/commands/**/*.ts'
     checks:
+      # Semantic Check: New Command Created
+      - actions:
+          - urgency: 1
+            template: |
+              # New Command Detected
+
+              A new command class has been created: `{{extract.name}}`
+
+              ```typescript
+              {{diffText}}
+              ```
+        filters:
+          - type: tsq
+            query: |
+              (class_declaration
+                name: (type_identifier) @name
+                extends_clause: (class_heritage
+                  (expression_with_type_arguments
+                    (identifier) @base_class
+                    (#eq? @base_class "Command")
+                  )
+                )
+              ) @class_decl
+            capture: class_decl
+
       # Command arguments
       - actions:
           - urgency: 3

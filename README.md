@@ -7,16 +7,14 @@ Process code changes with semantic rules
 [![Downloads/week](https://img.shields.io/npm/dw/distill.svg)](https://npmjs.org/package/distill)
 
 <!-- toc -->
-
-- [distill](#distill)
-- [Usage](#usage)
-- [Commands](#commands)
+* [distill](#distill)
+* [Usage](#usage)
+* [Commands](#commands)
 <!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
-
 ```sh-session
 $ npm install -g @distill/cli
 $ distill COMMAND
@@ -28,23 +26,22 @@ USAGE
   $ distill COMMAND
 ...
 ```
-
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
+* [`distill annotate diff BASE HEAD`](#distill-annotate-diff-base-head)
+* [`distill annotate pr PR`](#distill-annotate-pr-pr)
+* [`distill help [COMMAND]`](#distill-help-command)
 
-- [`distill diff annotate BASE HEAD`](#distill-diff-annotate-base-head)
-- [`distill help [COMMAND]`](#distill-help-command)
-
-## `distill diff annotate BASE HEAD`
+## `distill annotate diff BASE HEAD`
 
 Annotate a git diff with semantic analysis based on configured rules.
 
 ```
 USAGE
-  $ distill diff annotate BASE HEAD [--color] [-c <value>] [--json] [-r <value>]
+  $ distill annotate diff BASE HEAD [-c <value>] [--json] [-r <value>]
 
 ARGUMENTS
   BASE  Base commit-ish (e.g., HEAD~1, main, a1b2c3d)
@@ -53,7 +50,6 @@ ARGUMENTS
 FLAGS
   -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
   -r, --repo=<value>    Path to git repository
-      --color           Syntax highlight output diffs
       --json            Output reports in JSON format. Note: "lineRange" in metadata is relative to the filtered
                         artifact, not necessarily the original source file. For some filters (like jq/xpath), exact
                         source line mapping may be approximate.
@@ -67,16 +63,38 @@ DESCRIPTION
   Future versions may map these back to original source lines for supported filters (ast-grep, tsq, xpath).
 
 EXAMPLES
-  $ distill diff annotate HEAD~1 HEAD
+  $ distill annotate diff HEAD~1 HEAD
 
-  $ distill diff annotate main feat/foo
+  $ distill annotate diff main feat/foo
 
-  $ distill diff annotate HEAD . # compare HEAD to working directory
+  $ distill annotate diff HEAD . # compare HEAD to working directory
 
-  $ distill diff annotate main HEAD --repo ../other-project
+  $ distill annotate diff main HEAD --repo ../other-project
 ```
 
-_See code: [src/commands/diff/annotate.ts](https://github.com/zetlen/distill/blob/v1.0.2/src/commands/diff/annotate.ts)_
+_See code: [src/commands/annotate/diff.ts](https://github.com/zetlen/distill/blob/v1.0.2/src/commands/annotate/diff.ts)_
+
+## `distill annotate pr PR`
+
+Annotate a GitHub Pull Request
+
+```
+USAGE
+  $ distill annotate pr PR [-c <value>] [--json] [-r <value>]
+
+ARGUMENTS
+  PR  PR number or URL
+
+FLAGS
+  -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
+  -r, --repo=<value>    GitHub repository (owner/repo). Required if not running in a git repo.
+      --json            Output reports in JSON format
+
+DESCRIPTION
+  Annotate a GitHub Pull Request
+```
+
+_See code: [src/commands/annotate/pr.ts](https://github.com/zetlen/distill/blob/v1.0.2/src/commands/annotate/pr.ts)_
 
 ## `distill help [COMMAND]`
 
@@ -97,5 +115,4 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.36/src/commands/help.ts)_
-
 <!-- commandsstop -->
