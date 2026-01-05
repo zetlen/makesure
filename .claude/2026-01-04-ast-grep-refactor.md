@@ -80,6 +80,6 @@ type AstGrepFilterConfig = {
 
 ## Other Fixes
 
-- Fixed regex filter in `makesure.yml` - added `flags: "s"` for multiline matching
-- Fixed typo in makesure.yml template (4 backticks -> 3)
+- Fixed regex filter in `distill.yml` - added `flags: "s"` for multiline matching
+- Fixed typo in distill.yml template (4 backticks -> 3)
 - Updated test fixture config to use new schema format

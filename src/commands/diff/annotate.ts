@@ -4,7 +4,7 @@ import {execFile} from 'node:child_process'
 import {join, resolve} from 'node:path'
 import {promisify} from 'node:util'
 
-import type {Check, FileCheckset, MakesureConfig} from '../../lib/configuration/config.js'
+import type {Check, DistillConfig, FileCheckset} from '../../lib/configuration/config.js'
 
 import {executeReportAction, isReportAction, type ReportOutput} from '../../lib/actions/index.js'
 import {loadConfig} from '../../lib/configuration/loader.js'
@@ -37,7 +37,7 @@ export default class DiffAnnotate extends Command {
     }),
     config: Flags.string({
       char: 'c',
-      description: 'Path to the makesure configuration file (default: makesure.yml in repo root)',
+      description: 'Path to the distill configuration file (default: distill.yml in repo root)',
     }),
     repo: Flags.string({
       char: 'r',
@@ -53,8 +53,8 @@ export default class DiffAnnotate extends Command {
     const repoPath = flags.repo ? resolve(process.cwd(), flags.repo) : await this.getGitToplevel(process.cwd())
     this.debug('found repo path', repoPath)
 
-    // Resolve config path (default to makesure.yml in repo root)
-    const configPath = flags.config ? resolve(process.cwd(), flags.config) : join(repoPath, 'makesure.yml')
+    // Resolve config path (default to distill.yml in repo root)
+    const configPath = flags.config ? resolve(process.cwd(), flags.config) : join(repoPath, 'distill.yml')
     this.debug('found config path', configPath)
 
     // Load configuration
@@ -100,7 +100,7 @@ export default class DiffAnnotate extends Command {
 
   private async processFiles(
     files: File[],
-    config: MakesureConfig,
+    config: DistillConfig,
     refs: RefPair,
     cwd: string,
   ): Promise<ReportOutput[]> {

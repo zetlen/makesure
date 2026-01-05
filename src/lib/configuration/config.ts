@@ -116,10 +116,10 @@ export interface FileCheckset {
 }
 
 /**
- * Root configuration interface for makesure.yml files.
+ * Root configuration interface for distill.yml files.
  * Defines all the checksets for processing git diffs.
  */
-export interface MakesureConfig {
+export interface DistillConfig {
   /**
    * List of file checksets that define how to process different types of files.
    */

@@ -1,12 +1,12 @@
 {
-  "name": "makesure",
+  "name": "distill",
   "description": "Process code changes with semantic rules",
   "version": "0.0.0",
   "author": "zetlen",
   "bin": {
-    "makesure": "./bin/run.js"
+    "distill": "./bin/run.js"
   },
-  "bugs": "https://github.com/zetlen/makesure/issues",
+  "bugs": "https://github.com/zetlen/distill/issues",
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
@@ -57,7 +57,7 @@
     "./dist",
     "./oclif.manifest.json"
   ],
-  "homepage": "https://github.com/zetlen/makesure",
+  "homepage": "https://github.com/zetlen/distill",
   "keywords": [
     "oclif"
   ],
@@ -65,8 +65,8 @@
   "main": "dist/index.js",
   "type": "module",
   "oclif": {
-    "bin": "makesure",
-    "dirname": "makesure",
+    "bin": "distill",
+    "dirname": "distill",
     "commands": "./dist/commands",
     "plugins": [
       "@oclif/plugin-help"
@@ -78,12 +78,12 @@
       }
     }
   },
-  "repository": "zetlen/makesure",
+  "repository": "zetlen/distill",
   "scripts": {
     "build": "shx rm -rf dist && tsc",
-    "build:docker": "docker buildx build -t zetlen/makesure:edge --platform linux/amd64 .",
+    "build:docker": "docker buildx build -t zetlen/distill:edge --platform linux/amd64 .",
     "format": "prettier --write",
-    "generate-schema": "ts-json-schema-generator --no-type-check --path lib/configuration/config.ts --type MakesureConfig -o makesure-schema.json",
+    "generate-schema": "ts-json-schema-generator --no-type-check --path lib/configuration/config.ts --type DistillConfig -o distill-schema.json",
     "lint": "eslint",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",

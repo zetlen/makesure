@@ -48,8 +48,8 @@ export function runWithStdin(command: string, args: string[], input: string): Pr
  */
 export async function createDiffText(left: string, right: string): Promise<string> {
   const id = randomBytes(8).toString('hex')
-  const leftPath = join(tmpdir(), `makesure-left-${id}`)
-  const rightPath = join(tmpdir(), `makesure-right-${id}`)
+  const leftPath = join(tmpdir(), `distill-left-${id}`)
+  const rightPath = join(tmpdir(), `distill-right-${id}`)
 
   await writeFile(leftPath, left)
   await writeFile(rightPath, right)

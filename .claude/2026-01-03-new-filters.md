@@ -4,7 +4,7 @@
 
 ## Overview
 
-Implemented three new file filters for the `makesure` diff:annotate command:
+Implemented three new file filters for the `distill` diff:annotate command:
 
 1. **regex** - Regular expression matching
 2. **xpath** - XPath queries for XML/HTML

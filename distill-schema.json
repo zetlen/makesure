@@ -1,5 +1,5 @@
 {
-  "$ref": "#/definitions/MakesureConfig",
+  "$ref": "#/definitions/DistillConfig",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "AstGrepFilterConfig": {
@@ -183,9 +183,9 @@
       "required": ["query", "type"],
       "type": "object"
     },
-    "MakesureConfig": {
+    "DistillConfig": {
       "additionalProperties": false,
-      "description": "Root configuration interface for makesure.yml files. Defines all the checksets for processing git diffs.",
+      "description": "Root configuration interface for distill.yml files. Defines all the checksets for processing git diffs.",
       "properties": {
         "checksets": {
           "description": "List of file checksets that define how to process different types of files.",

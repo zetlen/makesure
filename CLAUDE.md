@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`makesure` is an oclif-based CLI tool that processes code changes with semantic rules. It analyzes git diffs and applies configurable rules to generate reports or run actions based on filtered file changes.
+`distill` is an oclif-based CLI tool that processes code changes with semantic rules. It analyzes git diffs and applies configurable rules to generate reports or run actions based on filtered file changes.
 
 ## Essential Commands
 
@@ -48,7 +48,7 @@ npm run generate-schema
 
 ### Configuration System
 
-The core of makesure is a rule-based configuration system defined in `src/lib/configuration/config.ts`:
+The core of distill is a rule-based configuration system defined in `src/lib/configuration/config.ts`:
 
 - **FileCheckset**: Maps file patterns (globs via `include`) to checks
 - **Check**: Contains filters and actions to apply to matching files
@@ -59,7 +59,7 @@ The core of makesure is a rule-based configuration system defined in `src/lib/co
   - **ReportAction**: Generates text reports using Handlebars templates with markdown support
   - **RunAction**: Executes arbitrary commands with environment variables from the filter results
 
-Configuration is stored in `makesure.yml` at the project root, with JSON schema validation available via `makesure-schema.json`.
+Configuration is stored in `distill.yml` at the project root, with JSON schema validation available via `distill-schema.json`.
 
 ### Available Filters
 

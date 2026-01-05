@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=./makesure-schema.json
+# yaml-language-server: $schema=./distill-schema.json
 checksets:
   # =============================================================================
   # PACKAGE.JSON CHECKS
@@ -158,11 +158,11 @@ checksets:
             query: '(type_alias_declaration name: (type_identifier) @name (#eq? @name "FilterConfig")) @decl'
             capture: decl
 
-      # MakesureConfig interface
+      # DistillConfig interface
       - actions:
           - urgency: 3
             template: |
-              # MakesureConfig interface changed
+              # DistillConfig interface changed
 
               The root configuration interface has changed. Regenerate schema with `npm run generate-schema`.
 
@@ -171,7 +171,7 @@ checksets:
               ```
         filters:
           - type: tsq
-            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "MakesureConfig")) @decl'
+            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "DistillConfig")) @decl'
             capture: decl
 
       # Check interface
@@ -410,14 +410,14 @@ checksets:
   # =============================================================================
   # SCHEMA
   # =============================================================================
-  - include: 'makesure-schema.json'
+  - include: 'distill-schema.json'
     checks:
       - actions:
           - urgency: 1
             template: |
               # JSON Schema updated
 
-              The makesure configuration schema has changed.
+              The distill configuration schema has changed.
 
               ```diff
               {{diffText}}

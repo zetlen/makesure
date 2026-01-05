@@ -137,7 +137,7 @@ function runAstGrep(args: string[], input: string): Promise<string> {
  * Used for pattern objects with context and selector.
  */
 function buildInlineRule(language: string, pattern: AstGrepPatternObject): string {
-  return `id: makesure-filter
+  return `id: distill-filter
 language: ${language}
 rule:
   pattern:
