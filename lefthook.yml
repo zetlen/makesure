@@ -13,3 +13,8 @@ pre-commit:
       run: npm run lint -- --fix {staged_files}
       stage_fixed: true
       glob: '*.{js,ts,jsx,tsx}'
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx commitlint --edit {1}

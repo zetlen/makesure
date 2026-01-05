@@ -2,22 +2,32 @@ name: tests
 on:
   push:
     branches-ignore: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   unit-tests:
     strategy:
       matrix:
         os: ['ubuntu-latest']
-        node_version: [lts/-1, lts/*, latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: 2025.12.13
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node_version }}
+          node-version-file: '.node-version'
           cache: npm
-      - run: npm install
+      - run: npm ci
+      - run: npm run lint
       - run: npm run build
       - run: npm run test

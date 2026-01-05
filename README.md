@@ -18,11 +18,11 @@ Process code changes with semantic rules
 <!-- usage -->
 
 ```sh-session
-$ npm install -g distill
+$ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-distill/0.0.0 darwin-arm64 node-v25.2.1
+@distill/cli/0.0.0 darwin-arm64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
