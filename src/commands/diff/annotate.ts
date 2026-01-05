@@ -24,7 +24,11 @@ export default class DiffAnnotate extends Command {
       required: true,
     }),
   }
-  static override description = 'Annotate a git diff with semantic analysis based on configured rules'
+  static override description = `Annotate a git diff with semantic analysis based on configured rules.
+  
+  When using --json, a "lineRange" field is included. Note that this range refers to the line numbers within the *filtered artifact* (the code snippet shown in the report), NOT the original source file.
+  
+  Future versions may map these back to original source lines for supported filters (ast-grep, tsq, xpath).`
   static override examples = [
     '<%= config.bin %> <%= command.id %> HEAD~1 HEAD',
     '<%= config.bin %> <%= command.id %> main feat/foo',
