@@ -1,7 +1,7 @@
 {
   "name": "@distill/cli",
   "description": "Process code changes with semantic rules",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": "zetlen",
   "bin": {
     "distill": "./bin/run.js"
