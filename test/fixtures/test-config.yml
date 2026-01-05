@@ -1,6 +1,6 @@
-rules:
-  - pattern: "package.json"
-    rules:
+checksets:
+  - include: 'package.json'
+    checks:
       - actions:
           - urgency: 1
             template: |
@@ -12,6 +12,5 @@ rules:
               {{diffText}}
               ```
         filters:
-          - type: "jq"
-            args:
-              - .dependencies
+          - type: 'jq'
+            query: '.dependencies'

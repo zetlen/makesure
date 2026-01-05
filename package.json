@@ -83,7 +83,7 @@
     "build": "shx rm -rf dist && tsc",
     "build:docker": "docker buildx build -t zetlen/makesure:edge --platform linux/amd64 .",
     "format": "prettier --write",
-    "generate-schema": "ts-json-schema-generator --path lib/configuration/config.ts --type MakesureConfig > makesure-schema.json",
+    "generate-schema": "ts-json-schema-generator --no-type-check --path lib/configuration/config.ts --type MakesureConfig -o makesure-schema.json",
     "lint": "eslint",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",

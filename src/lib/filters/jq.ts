@@ -1,5 +1,5 @@
 import type {FileVersions} from '../diff/parser.js'
-import type {BaseFilterConfig, FilterApplier, FilterResult} from './types.js'
+import type {FilterApplier, FilterResult} from './types.js'
 
 import {createDiffText, runWithStdin} from './utils.js'
 
@@ -21,7 +21,7 @@ import {createDiffText, runWithStdin} from './utils.js'
  *     query: ".dependencies | keys"
  * ```
  */
-export interface JqFilterConfig extends BaseFilterConfig {
+export interface JqFilterConfig {
   /**
    * The jq query expression to apply to JSON content.
    * See https://jqlang.github.io/jq/manual/ for syntax reference.
@@ -78,9 +78,6 @@ export const jqFilter: FilterApplier<JqFilterConfig> = {
  * Apply a jq filter to file versions and return the filter result.
  * @deprecated Use jqFilter.apply() with JqFilterConfig instead
  */
-export async function applyJqFilter(
-  versions: FileVersions,
-  args: string[],
-): Promise<FilterResult | null> {
+export async function applyJqFilter(versions: FileVersions, args: string[]): Promise<FilterResult | null> {
   return jqFilter.apply(versions, {query: args[0], type: 'jq'})
 }

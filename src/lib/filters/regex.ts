@@ -1,5 +1,5 @@
 import type {FileVersions} from '../diff/parser.js'
-import type {BaseFilterConfig, FilterApplier, FilterResult} from './types.js'
+import type {FilterApplier, FilterResult} from './types.js'
 
 import {createDiffText} from './utils.js'
 
@@ -22,7 +22,7 @@ import {createDiffText} from './utils.js'
  *     flags: "i"
  * ```
  */
-export interface RegexFilterConfig extends BaseFilterConfig {
+export interface RegexFilterConfig {
   /**
    * Optional regex flags to modify matching behavior.
    * The 'g' (global) and 'm' (multiline) flags are always applied automatically.
@@ -97,10 +97,7 @@ export const regexFilter: FilterApplier<RegexFilterConfig> = {
  * Apply a regex filter to extract matching lines from content.
  * @deprecated Use regexFilter.apply() with RegexFilterConfig instead
  */
-export async function applyRegexFilter(
-  versions: FileVersions,
-  args: string[],
-): Promise<FilterResult | null> {
+export async function applyRegexFilter(versions: FileVersions, args: string[]): Promise<FilterResult | null> {
   if (args.length === 0) {
     throw new Error('Regex filter requires at least a pattern argument')
   }

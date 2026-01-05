@@ -11,24 +11,24 @@ describe('configuration/loader', () => {
     const configPath = resolve(__dirname, '../../fixtures/test-config.yml')
     const config = await loadConfig(configPath)
 
-    expect(config).to.have.property('rules')
-    expect(config.rules).to.be.an('array').with.lengthOf(1)
-    expect(config.rules[0]).to.have.property('pattern', 'package.json')
+    expect(config).to.have.property('checksets')
+    expect(config.checksets).to.be.an('array').with.lengthOf(1)
+    expect(config.checksets[0]).to.have.property('include', 'package.json')
   })
 
   it('parses nested rule structures', async () => {
     const configPath = resolve(__dirname, '../../fixtures/test-config.yml')
     const config = await loadConfig(configPath)
 
-    const ruleset = config.rules[0]
-    expect(ruleset.rules).to.be.an('array').with.lengthOf(1)
+    const checkset = config.checksets[0]
+    expect(checkset.checks).to.be.an('array').with.lengthOf(1)
 
-    const rule = ruleset.rules[0]
-    expect(rule.filters).to.be.an('array').with.lengthOf(1)
-    expect(rule.filters[0]).to.deep.include({args: ['.dependencies'], type: 'jq'})
+    const check = checkset.checks[0]
+    expect(check.filters).to.be.an('array').with.lengthOf(1)
+    expect(check.filters[0]).to.deep.include({query: '.dependencies', type: 'jq'})
 
-    expect(rule.actions).to.be.an('array').with.lengthOf(1)
-    expect(rule.actions[0]).to.have.property('urgency', 1)
-    expect(rule.actions[0]).to.have.property('template').that.includes('Test Report')
+    expect(check.actions).to.be.an('array').with.lengthOf(1)
+    expect(check.actions[0]).to.have.property('urgency', 1)
+    expect(check.actions[0]).to.have.property('template').that.includes('Test Report')
   })
 })

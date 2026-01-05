@@ -1,19 +1,19 @@
-makesure
-=================
+# makesure
 
 Process code changes with semantic rules
-
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/makesure.svg)](https://npmjs.org/package/makesure)
 [![Downloads/week](https://img.shields.io/npm/dw/makesure.svg)](https://npmjs.org/package/makesure)
 
-
 <!-- toc -->
+* [makesure](#makesure)
 * [Usage](#usage)
 * [Commands](#commands)
 <!-- tocstop -->
+
 # Usage
+
 <!-- usage -->
 ```sh-session
 $ npm install -g makesure
@@ -27,7 +27,9 @@ USAGE
 ...
 ```
 <!-- usagestop -->
+
 # Commands
+
 <!-- commands -->
 * [`makesure diff annotate BASE HEAD`](#makesure-diff-annotate-base-head)
 * [`makesure help [COMMAND]`](#makesure-help-command)

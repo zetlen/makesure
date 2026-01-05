@@ -2,7 +2,7 @@ import {dirname, extname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 import type {FileVersions} from '../diff/parser.js'
-import type {BaseFilterConfig, FilterApplier, FilterResult} from './types.js'
+import type {FilterApplier, FilterResult} from './types.js'
 
 import {createDiffText} from './utils.js'
 
@@ -58,7 +58,7 @@ export type TsqSupportedExtension =
  *     language: ".py"
  * ```
  */
-export interface TsqFilterConfig extends BaseFilterConfig {
+export interface TsqFilterConfig {
   /**
    * Optional capture name to filter results.
    * When specified, only nodes matching this capture name will be extracted.
@@ -166,7 +166,10 @@ async function initTreeSitter(): Promise<TreeSitterType> {
 /**
  * Get or load a tree-sitter language for the given file extension.
  */
-async function getLanguageForExtension(ext: string, ts: TreeSitterType): Promise<import('web-tree-sitter').Language | null> {
+async function getLanguageForExtension(
+  ext: string,
+  ts: TreeSitterType,
+): Promise<import('web-tree-sitter').Language | null> {
   const wasmRelPath = LANGUAGE_WASM_MAP[ext.toLowerCase()]
   if (!wasmRelPath) return null
 
@@ -227,9 +230,7 @@ export const tsqFilter: FilterApplier<TsqFilterConfig> = {
         const captures = query.captures(tree.rootNode)
 
         // Filter by capture name if specified
-        const filteredCaptures = capture
-          ? captures.filter((c) => c.name === capture)
-          : captures
+        const filteredCaptures = capture ? captures.filter((c) => c.name === capture) : captures
 
         // Extract unique node texts (deduplicate by node id)
         const seen = new Set<number>()
@@ -292,10 +293,14 @@ export async function applyTsqFilter(
 
   const [query, capture, language] = args
 
-  return tsqFilter.apply(versions, {
-    capture,
-    language: language as TsqSupportedExtension | undefined,
-    query,
-    type: 'tsq',
-  }, filePath)
+  return tsqFilter.apply(
+    versions,
+    {
+      capture,
+      language: language as TsqSupportedExtension | undefined,
+      query,
+      type: 'tsq',
+    },
+    filePath,
+  )
 }

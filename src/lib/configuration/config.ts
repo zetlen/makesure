@@ -4,19 +4,6 @@ import type {RegexFilterConfig} from '../filters/regex.js'
 import type {TsqFilterConfig} from '../filters/tsq.js'
 import type {XPathFilterConfig} from '../filters/xpath.js'
 
-/**
- * Base interface for reusable definitions.
- * Any definition can be given a name for reuse elsewhere in the config.
- */
-type ReusableDefinition = {
-  /**
-   * Optional name of the definition, for reuse. Names must be unique.
-   * To use a definition by name, provide its name instead of the inline
-   * definition object.
-   */
-  name?: string
-}
-
 // Re-export filter config types for convenience
 export type {AstGrepFilterConfig} from '../filters/ast-grep.js'
 export type {JqFilterConfig} from '../filters/jq.js'
@@ -56,7 +43,7 @@ export type {XPathFilterConfig} from '../filters/xpath.js'
  * It can be routed many places, including to stdout or an API call
  * (for example, a GitHub comment).
  */
-interface ReportAction extends ReusableDefinition {
+interface ReportAction {
   /**
    * Handlebars template for the comment to produce. Accepts markdown,
    * and receives a FilterResult as its evaluation context.
@@ -73,7 +60,7 @@ interface ReportAction extends ReusableDefinition {
  * A "run" action runs an arbitrary command that receives details about the
  * change as environment variables.
  */
-interface RunAction extends ReusableDefinition {
+interface RunAction {
   /**
    * If the command requires arguments, they can be evaluated here as Handlebars
    * templates which receive a FilterResult as evaluation context.
@@ -97,12 +84,12 @@ interface RunAction extends ReusableDefinition {
 type Action = ReportAction | RunAction
 
 /**
- * A rule defines filters to apply and actions to take when changes match.
+ * A check defines filters to apply and actions to take when changes match.
  */
-interface Rule extends ReusableDefinition {
+export interface Check {
   /**
-   * Actions to run when the rule is triggered.
-   * Will run once per file that matches the rule's filters.
+   * Actions to run when the check is triggered.
+   * Will run once per file that matches the check's filters.
    */
   actions: Action[]
   /**
@@ -114,28 +101,27 @@ interface Rule extends ReusableDefinition {
 }
 
 /**
- * A FileRuleset maps file patterns to rules.
- * Files matching the pattern will have the rules applied to them.
+ * Files matching the glob pattern will have the checks applied to them.
  */
-interface FileRuleset {
+export interface FileCheckset {
   /**
-   * Glob pattern for files to which this ruleset applies.
+   * List of checks to apply to files matching the pattern.
+   */
+  checks: Check[]
+  /**
+   * Glob pattern for files to which this checkset applies.
    * Uses minimatch syntax for pattern matching.
    */
-  pattern: string
-  /**
-   * List of rules to apply to files matching the pattern.
-   */
-  rules: Rule[]
+  include: string
 }
 
 /**
  * Root configuration interface for makesure.yml files.
- * Defines all the rules for processing git diffs.
+ * Defines all the checksets for processing git diffs.
  */
 export interface MakesureConfig {
   /**
-   * List of file rulesets that define how to process different types of files.
+   * List of file checksets that define how to process different types of files.
    */
-  rules: FileRuleset[]
+  checksets: FileCheckset[]
 }

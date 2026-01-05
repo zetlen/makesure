@@ -1,55 +1,32 @@
+import {spawn} from 'node:child_process'
+
 import type {FileVersions} from '../diff/parser.js'
-import type {BaseFilterConfig, FilterApplier, FilterResult} from './types.js'
+import type {FilterApplier, FilterResult} from './types.js'
 
-import {createDiffText, runWithStdin} from './utils.js'
-
-/**
- * Supported languages for ast-grep.
- * These correspond to the --lang flag values.
- */
-export type AstGrepLanguage =
-  | 'c'
-  | 'cpp'
-  | 'css'
-  | 'go'
-  | 'html'
-  | 'java'
-  | 'javascript'
-  | 'json'
-  | 'kotlin'
-  | 'lua'
-  | 'python'
-  | 'rust'
-  | 'scala'
-  | 'swift'
-  | 'tsx'
-  | 'typescript'
+import {createDiffText} from './utils.js'
 
 /**
- * Map file extensions to ast-grep language names.
+ * Pattern object for ast-grep with context and selector.
+ * Used for precise matching within specific AST structures.
+ *
+ * @example
+ * ```yaml
+ * pattern:
+ *   context: 'class C { static override args = $ARGS }'
+ *   selector: public_field_definition
+ * ```
  */
-const EXTENSION_TO_LANGUAGE: Record<string, AstGrepLanguage> = {
-  '.c': 'c',
-  '.cpp': 'cpp',
-  '.css': 'css',
-  '.cxx': 'cpp',
-  '.go': 'go',
-  '.h': 'c',
-  '.hpp': 'cpp',
-  '.html': 'html',
-  '.java': 'java',
-  '.js': 'javascript',
-  '.json': 'json',
-  '.jsx': 'javascript',
-  '.kt': 'kotlin',
-  '.lua': 'lua',
-  '.mjs': 'javascript',
-  '.py': 'python',
-  '.rs': 'rust',
-  '.scala': 'scala',
-  '.swift': 'swift',
-  '.ts': 'typescript',
-  '.tsx': 'tsx',
+export interface AstGrepPatternObject {
+  /**
+   * Full code snippet providing context for parsing.
+   * This helps ast-grep understand the syntactic structure.
+   */
+  context: string
+  /**
+   * AST node type to select from the matched context.
+   * Ensures precise targeting of specific syntax elements.
+   */
+  selector: string
 }
 
 /**
@@ -85,53 +62,26 @@ const EXTENSION_TO_LANGUAGE: Record<string, AstGrepLanguage> = {
  *
  * @example
  * ```yaml
- * # Find Go struct definitions with selector for precise matching
+ * # Find specific field in class with context and selector
  * filters:
  *   - type: ast-grep
- *     pattern: "type $NAME struct { $$$FIELDS }"
- *     language: go
- *     selector: type_declaration
+ *     language: typescript
+ *     pattern:
+ *       context: 'class C { static override args = $ARGS }'
+ *       selector: public_field_definition
  * ```
  */
-export interface AstGrepFilterConfig extends BaseFilterConfig {
+export type AstGrepFilterConfig = {
   /**
-   * The language to use for parsing.
-   * If not specified, the language is inferred from the file extension.
-   *
-   * Supported languages: c, cpp, css, go, html, java, javascript, json,
-   * kotlin, lua, python, rust, scala, swift, typescript, tsx
-   *
-   * @example "javascript"
-   * @example "python"
-   * @example "typescript"
+   * The language to parse the code as.
+   * Required for accurate AST parsing.
    */
-  language?: AstGrepLanguage
-
+  language: string
   /**
-   * The pattern to match against the source code.
-   * Uses ast-grep's pattern syntax which looks like actual code.
-   *
-   * Metavariables:
-   * - `$VAR`: Matches any single AST node
-   * - `$$$VAR`: Matches zero or more AST nodes (for sequences like arguments)
-   *
-   * @example "console.log($$$ARGS)"
-   * @example "function $NAME($$$PARAMS) { $$$BODY }"
-   * @example "import { $$$IMPORTS } from '$MODULE'"
+   * The pattern to match against. Can be a simple string pattern
+   * or an object with context and selector for precise matching.
    */
-  pattern: string
-
-  /**
-   * Optional AST node kind to use as a selector for more precise matching.
-   * When specified, only nodes of this kind that match the pattern are returned.
-   * This is useful when a pattern might match unintended node types.
-   *
-   * @example "function_declaration"
-   * @example "class_declaration"
-   * @example "call_expression"
-   */
-  selector?: string
-
+  pattern: AstGrepPatternObject | string
   /**
    * Discriminant tag identifying this as an ast-grep filter.
    */
@@ -139,71 +89,109 @@ export interface AstGrepFilterConfig extends BaseFilterConfig {
 }
 
 /**
- * Get the ast-grep language from a file extension.
+ * Run ast-grep command with stdin input and return stdout.
  */
-function getLanguageFromExtension(filePath: string): AstGrepLanguage | null {
-  const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
-  return EXTENSION_TO_LANGUAGE[ext] ?? null
+function runAstGrep(args: string[], input: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ast-grep', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    proc.stdout.on('data', (data: Buffer) => {
+      stdout += data.toString()
+    })
+
+    proc.stderr.on('data', (data: Buffer) => {
+      stderr += data.toString()
+    })
+
+    proc.on('close', (code) => {
+      // ast-grep run returns 0 for no matches, 1 for matches found
+      // ast-grep scan returns 0 for success, 1 for matches (when used as linter)
+      // We accept both as valid responses as long as we have output or no errors
+      if (code === 0 || code === 1 || stdout) {
+        resolve(stdout)
+      } else {
+        reject(new Error(`ast-grep exited with code ${code}: ${stderr}`))
+      }
+    })
+
+    proc.on('error', (err) => {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        reject(new Error('ast-grep command not found. Please install it: npm install -g @ast-grep/cli'))
+      } else {
+        reject(err)
+      }
+    })
+
+    proc.stdin.write(input)
+    proc.stdin.end()
+  })
 }
 
 /**
- * Parse ast-grep JSON output and extract matched text.
+ * Build inline rule YAML for ast-grep scan command.
+ * Used for pattern objects with context and selector.
  */
-function parseAstGrepOutput(jsonOutput: string): string[] {
-  if (!jsonOutput.trim()) return []
+function buildInlineRule(language: string, pattern: AstGrepPatternObject): string {
+  return `id: makesure-filter
+language: ${language}
+rule:
+  pattern:
+    context: "${pattern.context}"
+    selector: ${pattern.selector}
+`
+}
+
+/**
+ * Extract matched text from ast-grep JSON output.
+ */
+function extractMatchedText(jsonOutput: string): string {
+  if (!jsonOutput.trim()) {
+    return ''
+  }
 
   try {
-    // ast-grep --json outputs a JSON array of match objects
-    const results = JSON.parse(jsonOutput) as Array<{text?: string}>
-    return results
-      .filter((match): match is {text: string} => typeof match.text === 'string')
-      .map((match) => match.text)
+    const matches = JSON.parse(jsonOutput) as Array<{text: string}>
+    return matches.map((m) => m.text).join('\n\n')
   } catch {
-    // If parsing fails, return empty
-    return []
+    // If parsing fails, return empty string
+    return ''
   }
 }
 
 /**
  * ast-grep filter for extracting AST nodes using pattern matching.
+ * Uses the ast-grep CLI tool to parse and search code.
  */
 export const astGrepFilter: FilterApplier<AstGrepFilterConfig> = {
-  async apply(versions: FileVersions, config: AstGrepFilterConfig, filePath?: string): Promise<FilterResult | null> {
-    const {language: languageOverride, pattern, selector} = config
+  async apply(versions: FileVersions, config: AstGrepFilterConfig): Promise<FilterResult | null> {
+    const {language, pattern} = config
 
     // Determine language
-    const language = languageOverride ?? (filePath ? getLanguageFromExtension(filePath) : null)
     if (!language) {
-      throw new Error('ast-grep filter requires a language (either from file extension or as "language" config property)')
+      throw new Error('ast-grep filter requires a language to be specified')
     }
 
     const extractNodes = async (content: null | string): Promise<string> => {
       if (!content) return ''
 
-      try {
-        // Build ast-grep command arguments
-        const args = ['run', '--pattern', pattern, '--lang', language, '--json', '--stdin']
+      let args: string[]
 
-        if (selector) {
-          args.push('--selector', selector)
-        }
-
-        const output = await runWithStdin('ast-grep', args, content)
-        const matches = parseAstGrepOutput(output)
-
-        // Deduplicate and join matches
-        const uniqueMatches = [...new Set(matches)]
-        return uniqueMatches.join('\n\n')
-      } catch (error) {
-        // Check if ast-grep is not installed
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes('ENOENT') || errorMessage.includes('not found')) {
-          throw new Error('ast-grep command not found. Please install it: https://ast-grep.github.io/guide/quick-start.html#installation')
-        }
-
-        // For other errors (like invalid patterns), return empty
-        return ''
+      if (typeof pattern === 'string') {
+        // Simple string pattern - use the simpler "run" command
+        args = ['run', '-p', pattern, '--lang', language, '--json', '--stdin']
+      } else {
+        // Pattern object with context/selector - use "scan" with inline rules
+        const inlineRule = buildInlineRule(language, pattern)
+        args = ['scan', '--inline-rules', inlineRule, '--json', '--stdin']
       }
+
+      const jsonOutput = await runAstGrep(args, content)
+      return extractMatchedText(jsonOutput)
     }
 
     // If both are null, nothing to filter
@@ -229,27 +217,4 @@ export const astGrepFilter: FilterApplier<AstGrepFilterConfig> = {
       right: {artifact: rightArtifact},
     }
   },
-}
-
-/**
- * Apply an ast-grep filter to extract matching nodes from source code.
- * @deprecated Use astGrepFilter.apply() with AstGrepFilterConfig instead
- */
-export async function applyAstGrepFilter(
-  versions: FileVersions,
-  args: string[],
-  filePath?: string,
-): Promise<FilterResult | null> {
-  if (args.length === 0) {
-    throw new Error('ast-grep filter requires at least a pattern argument')
-  }
-
-  const [pattern, language, selector] = args
-
-  return astGrepFilter.apply(versions, {
-    language: language as AstGrepLanguage | undefined,
-    pattern,
-    selector,
-    type: 'ast-grep',
-  }, filePath)
 }

@@ -7,35 +7,19 @@
       "description": "Configuration for the ast-grep filter. Extracts AST nodes from source code using ast-grep's pattern syntax. Patterns look like actual code with metavariables ($VAR) for wildcards.",
       "properties": {
         "language": {
-          "$ref": "#/definitions/AstGrepLanguage",
-          "description": "The language to use for parsing. If not specified, the language is inferred from the file extension.\n\nSupported languages: c, cpp, css, go, html, java, javascript, json, kotlin, lua, python, rust, scala, swift, typescript, tsx",
-          "examples": [
-            "javascript",
-            "python",
-            "typescript"
-          ]
-        },
-        "name": {
-          "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+          "description": "The language to parse the code as. Required for accurate AST parsing.",
           "type": "string"
         },
         "pattern": {
-          "description": "The pattern to match against the source code. Uses ast-grep's pattern syntax which looks like actual code.\n\nMetavariables:\n- `$VAR`: Matches any single AST node\n- `$$$VAR`: Matches zero or more AST nodes (for sequences like arguments)",
-          "examples": [
-            "console.log($$$ARGS)",
-            "function $NAME($$$PARAMS) { $$$BODY }",
-            "import { $$$IMPORTS } from '$MODULE'"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AstGrepPatternObject"
+            },
+            {
+              "type": "string"
+            }
           ],
-          "type": "string"
-        },
-        "selector": {
-          "description": "Optional AST node kind to use as a selector for more precise matching. When specified, only nodes of this kind that match the pattern are returned. This is useful when a pattern might match unintended node types.",
-          "examples": [
-            "function_declaration",
-            "class_declaration",
-            "call_expression"
-          ],
-          "type": "string"
+          "description": "The pattern to match against. Can be a simple string pattern or an object with context and selector for precise matching."
         },
         "type": {
           "const": "ast-grep",
@@ -43,33 +27,119 @@
           "type": "string"
         }
       },
-      "required": [
-        "pattern",
-        "type"
-      ],
+      "required": ["language", "pattern", "type"],
       "type": "object"
     },
-    "AstGrepLanguage": {
-      "description": "Supported languages for ast-grep. These correspond to the --lang flag values.",
-      "enum": [
-        "c",
-        "cpp",
-        "css",
-        "go",
-        "html",
-        "java",
-        "javascript",
-        "json",
-        "kotlin",
-        "lua",
-        "python",
-        "rust",
-        "scala",
-        "swift",
-        "tsx",
-        "typescript"
-      ],
-      "type": "string"
+    "AstGrepPatternObject": {
+      "additionalProperties": false,
+      "description": "Pattern object for ast-grep with context and selector. Used for precise matching within specific AST structures.",
+      "properties": {
+        "context": {
+          "description": "Full code snippet providing context for parsing. This helps ast-grep understand the syntactic structure.",
+          "type": "string"
+        },
+        "selector": {
+          "description": "AST node type to select from the matched context. Ensures precise targeting of specific syntax elements.",
+          "type": "string"
+        }
+      },
+      "required": ["context", "selector"],
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": false,
+      "description": "A check defines filters to apply and actions to take when changes match.",
+      "properties": {
+        "actions": {
+          "description": "Actions to run when the check is triggered. Will run once per file that matches the check's filters.",
+          "items": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to stdout or an API call (for example, a GitHub comment).",
+                "properties": {
+                  "template": {
+                    "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a FilterResult as its evaluation context.",
+                    "type": "string"
+                  },
+                  "urgency": {
+                    "description": "Urgency of report. Higher values indicate more important/urgent reports. Reports are sorted by urgency (highest first) when output.",
+                    "type": "number"
+                  }
+                },
+                "required": ["template", "urgency"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "description": "A \"run\" action runs an arbitrary command that receives details about the change as environment variables.",
+                "properties": {
+                  "args": {
+                    "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a FilterResult as evaluation context.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "command": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    ],
+                    "description": "Path to the command. Can be a string or an array of strings which will be evaluated as arguments to produce the command path."
+                  },
+                  "env": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a FilterResult as evaluation context.",
+                    "type": "object"
+                  }
+                },
+                "required": ["args", "command", "env"],
+                "type": "object"
+              }
+            ],
+            "description": "Union type of all supported actions."
+          },
+          "type": "array"
+        },
+        "filters": {
+          "description": "Filters to apply to the file content. Each filter processes the file and produces artifacts for comparison. If all filters produce a meaningful diff, the actions are triggered.",
+          "items": {
+            "$ref": "#/definitions/FilterConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["actions", "filters"],
+      "type": "object"
+    },
+    "FileCheckset": {
+      "additionalProperties": false,
+      "description": "Files matching the glob pattern will have the checks applied to them.",
+      "properties": {
+        "checks": {
+          "description": "List of checks to apply to files matching the pattern.",
+          "items": {
+            "$ref": "#/definitions/Check"
+          },
+          "type": "array"
+        },
+        "include": {
+          "description": "Glob pattern for files to which this checkset applies. Uses minimatch syntax for pattern matching.",
+          "type": "string"
+        }
+      },
+      "required": ["checks", "include"],
+      "type": "object"
     },
     "FilterConfig": {
       "anyOf": [
@@ -95,10 +165,6 @@
       "additionalProperties": false,
       "description": "Configuration for the jq filter. Uses the jq command-line tool to extract/transform JSON content.",
       "properties": {
-        "name": {
-          "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
-          "type": "string"
-        },
         "query": {
           "description": "The jq query expression to apply to JSON content. See https://jqlang.github.io/jq/manual/ for syntax reference.",
           "examples": [
@@ -114,141 +180,22 @@
           "type": "string"
         }
       },
-      "required": [
-        "query",
-        "type"
-      ],
+      "required": ["query", "type"],
       "type": "object"
     },
     "MakesureConfig": {
       "additionalProperties": false,
-      "description": "Root configuration interface for makesure.yml files. Defines all the rules for processing git diffs.",
+      "description": "Root configuration interface for makesure.yml files. Defines all the checksets for processing git diffs.",
       "properties": {
-        "rules": {
-          "description": "List of file rulesets that define how to process different types of files.",
+        "checksets": {
+          "description": "List of file checksets that define how to process different types of files.",
           "items": {
-            "additionalProperties": false,
-            "description": "A FileRuleset maps file patterns to rules. Files matching the pattern will have the rules applied to them.",
-            "properties": {
-              "pattern": {
-                "description": "Glob pattern for files to which this ruleset applies. Uses minimatch syntax for pattern matching.",
-                "type": "string"
-              },
-              "rules": {
-                "description": "List of rules to apply to files matching the pattern.",
-                "items": {
-                  "additionalProperties": false,
-                  "description": "A rule defines filters to apply and actions to take when changes match.",
-                  "properties": {
-                    "actions": {
-                      "description": "Actions to run when the rule is triggered. Will run once per file that matches the rule's filters.",
-                      "items": {
-                        "anyOf": [
-                          {
-                            "additionalProperties": false,
-                            "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to stdout or an API call (for example, a GitHub comment).",
-                            "properties": {
-                              "name": {
-                                "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
-                                "type": "string"
-                              },
-                              "template": {
-                                "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a FilterResult as its evaluation context.",
-                                "type": "string"
-                              },
-                              "urgency": {
-                                "description": "Urgency of report. Higher values indicate more important/urgent reports. Reports are sorted by urgency (highest first) when output.",
-                                "type": "number"
-                              }
-                            },
-                            "required": [
-                              "template",
-                              "urgency"
-                            ],
-                            "type": "object"
-                          },
-                          {
-                            "additionalProperties": false,
-                            "description": "A \"run\" action runs an arbitrary command that receives details about the change as environment variables.",
-                            "properties": {
-                              "args": {
-                                "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a FilterResult as evaluation context.",
-                                "items": {
-                                  "type": "string"
-                                },
-                                "type": "array"
-                              },
-                              "command": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "items": {
-                                      "type": "string"
-                                    },
-                                    "type": "array"
-                                  }
-                                ],
-                                "description": "Path to the command. Can be a string or an array of strings which will be evaluated as arguments to produce the command path."
-                              },
-                              "env": {
-                                "additionalProperties": {
-                                  "type": "string"
-                                },
-                                "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a FilterResult as evaluation context.",
-                                "type": "object"
-                              },
-                              "name": {
-                                "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "args",
-                              "command",
-                              "env"
-                            ],
-                            "type": "object"
-                          }
-                        ],
-                        "description": "Union type of all supported actions."
-                      },
-                      "type": "array"
-                    },
-                    "filters": {
-                      "description": "Filters to apply to the file content. Each filter processes the file and produces artifacts for comparison. If all filters produce a meaningful diff, the actions are triggered.",
-                      "items": {
-                        "$ref": "#/definitions/FilterConfig"
-                      },
-                      "type": "array"
-                    },
-                    "name": {
-                      "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "actions",
-                    "filters"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              }
-            },
-            "required": [
-              "pattern",
-              "rules"
-            ],
-            "type": "object"
+            "$ref": "#/definitions/FileCheckset"
           },
           "type": "array"
         }
       },
-      "required": [
-        "rules"
-      ],
+      "required": ["checksets"],
       "type": "object"
     },
     "RegexFilterConfig": {
@@ -257,23 +204,12 @@
       "properties": {
         "flags": {
           "description": "Optional regex flags to modify matching behavior. The 'g' (global) and 'm' (multiline) flags are always applied automatically.\n\nCommon flags:\n- 'i': Case-insensitive matching\n- 's': Dot matches newlines (dotAll mode)\n- 'u': Unicode mode",
-          "examples": [
-            "i",
-            "iu"
-          ],
-          "type": "string"
-        },
-        "name": {
-          "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+          "examples": ["i", "iu"],
           "type": "string"
         },
         "pattern": {
           "description": "The regular expression pattern to match. Uses JavaScript regex syntax.",
-          "examples": [
-            "API_KEY=.*",
-            "version\\s*=\\s*\\d+\\.\\d+\\.\\d+",
-            "import\\s+\\{[^}]+\\}\\s+from"
-          ],
+          "examples": ["API_KEY=.*", "version\\s*=\\s*\\d+\\.\\d+\\.\\d+", "import\\s+\\{[^}]+\\}\\s+from"],
           "type": "string"
         },
         "type": {
@@ -282,10 +218,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "pattern",
-        "type"
-      ],
+      "required": ["pattern", "type"],
       "type": "object"
     },
     "TsqFilterConfig": {
@@ -294,25 +227,13 @@
       "properties": {
         "capture": {
           "description": "Optional capture name to filter results. When specified, only nodes matching this capture name will be extracted. If omitted, all captures from the query will be included.",
-          "examples": [
-            "fn",
-            "class-name",
-            "method"
-          ],
+          "examples": ["fn", "class-name", "method"],
           "type": "string"
         },
         "language": {
           "$ref": "#/definitions/TsqSupportedExtension",
           "description": "Optional file extension to override language detection. By default, the language is detected from the file being processed. Use this when processing files with non-standard extensions.\n\nSupported extensions: .js, .jsx, .mjs, .ts, .tsx, .py, .go, .java, .rs, .c, .h, .cpp, .cxx, .hpp, .json",
-          "examples": [
-            ".js",
-            ".py",
-            ".ts"
-          ]
-        },
-        "name": {
-          "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
-          "type": "string"
+          "examples": [".js", ".py", ".ts"]
         },
         "query": {
           "description": "The tree-sitter query pattern using S-expression syntax. See https://tree-sitter.github.io/tree-sitter/using-parsers/queries for syntax reference.\n\nCommon patterns:\n- `(node_type)",
@@ -324,10 +245,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "query",
-        "type"
-      ],
+      "required": ["query", "type"],
       "type": "object"
     },
     "TsqSupportedExtension": {
@@ -357,15 +275,7 @@
       "properties": {
         "expression": {
           "description": "The XPath expression to evaluate against the XML/HTML content. See https://www.w3.org/TR/xpath/ for syntax reference.",
-          "examples": [
-            "//version",
-            "//dependency[groupId='com.example']/version",
-            "string(//project/version)"
-          ],
-          "type": "string"
-        },
-        "name": {
-          "description": "Optional name of the definition, for reuse. Names must be unique. To use a definition by name, provide its name instead of the inline definition object.",
+          "examples": ["//version", "//dependency[groupId='com.example']/version", "string(//project/version)"],
           "type": "string"
         },
         "namespaces": {
@@ -390,12 +300,8 @@
           "type": "string"
         }
       },
-      "required": [
-        "expression",
-        "type"
-      ],
+      "required": ["expression", "type"],
       "type": "object"
     }
   }
 }
-

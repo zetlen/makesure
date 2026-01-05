@@ -2,7 +2,7 @@ import {DOMParser, XMLSerializer} from '@xmldom/xmldom'
 import xpath from 'xpath'
 
 import type {FileVersions} from '../diff/parser.js'
-import type {BaseFilterConfig, FilterApplier, FilterResult} from './types.js'
+import type {FilterApplier, FilterResult} from './types.js'
 
 import {createDiffText} from './utils.js'
 
@@ -26,7 +26,7 @@ import {createDiffText} from './utils.js'
  *       m: "http://maven.apache.org/POM/4.0.0"
  * ```
  */
-export interface XPathFilterConfig extends BaseFilterConfig {
+export interface XPathFilterConfig {
   /**
    * The XPath expression to evaluate against the XML/HTML content.
    * See https://www.w3.org/TR/xpath/ for syntax reference.
@@ -78,14 +78,16 @@ export const xpathFilter: FilterApplier<XPathFilterConfig> = {
         }
 
         const serializer = new XMLSerializer()
-        return (nodes as {nodeType?: number}[]).map((node) => {
-          if ('nodeType' in node) {
-            // Element or text node
-            return serializer.serializeToString(node as unknown as globalThis.Node)
-          }
+        return (nodes as {nodeType?: number}[])
+          .map((node) => {
+            if ('nodeType' in node) {
+              // Element or text node
+              return serializer.serializeToString(node as unknown as globalThis.Node)
+            }
 
-          return String(node)
-        }).join('\n')
+            return String(node)
+          })
+          .join('\n')
       } catch {
         // If parsing fails, return empty
         return ''
@@ -119,16 +121,13 @@ export const xpathFilter: FilterApplier<XPathFilterConfig> = {
  * Apply an XPath filter to extract matching nodes from XML/HTML content.
  * @deprecated Use xpathFilter.apply() with XPathFilterConfig instead
  */
-export async function applyXpathFilter(
-  versions: FileVersions,
-  args: string[],
-): Promise<FilterResult | null> {
+export async function applyXpathFilter(versions: FileVersions, args: string[]): Promise<FilterResult | null> {
   if (args.length === 0) {
     throw new Error('XPath filter requires at least an expression argument')
   }
 
   const [expression, namespacesJson] = args
-  const namespaces = namespacesJson ? JSON.parse(namespacesJson) as Record<string, string> : undefined
+  const namespaces = namespacesJson ? (JSON.parse(namespacesJson) as Record<string, string>) : undefined
 
   return xpathFilter.apply(versions, {
     expression,

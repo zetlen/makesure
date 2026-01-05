@@ -1,5 +1,5 @@
 [tools]
-ast-grep = "0.40.3"
+ast-grep = "latest"
 jq = "1.8.1"
 yq = "4.50.1"
 
