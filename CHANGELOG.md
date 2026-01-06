@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/zetlen/distill/compare/cli-v1.0.2...cli-v1.1.0) (2026-01-06)
+
+
+### Features
+
+* add JSON reporter to diff:annotate ([#11](https://github.com/zetlen/distill/issues/11)) ([9d56f57](https://github.com/zetlen/distill/commit/9d56f57ddd52ea8b6678585c2c184c9579495432))
+* auto-detect PR for current branch in annotate pr command ([74e4855](https://github.com/zetlen/distill/commit/74e4855cf10be8dae66e4262704438172ebe23dd))
+* Improved Code Context (Symbolic Context) ([#13](https://github.com/zetlen/distill/issues/13)) ([a65ee0b](https://github.com/zetlen/distill/commit/a65ee0b4b71d3e47cf8f02cbcaadf2bbb68ef379))
+* work directly with github PRs ([#15](https://github.com/zetlen/distill/issues/15)) ([74e4855](https://github.com/zetlen/distill/commit/74e4855cf10be8dae66e4262704438172ebe23dd))
+
+
+### Bug Fixes
+
+* address PR review feedback ([74e4855](https://github.com/zetlen/distill/commit/74e4855cf10be8dae66e4262704438172ebe23dd))
+
 ## [1.0.2](https://github.com/zetlen/distill/compare/cli-v1.0.1...cli-v1.0.2) (2026-01-05)
 
 
