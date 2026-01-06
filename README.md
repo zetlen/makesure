@@ -20,7 +20,7 @@ $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/1.0.2 darwin-arm64 node-v24.12.0
+@distill/cli/1.1.0 linux-x64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
@@ -32,7 +32,7 @@ USAGE
 
 <!-- commands -->
 * [`distill annotate diff BASE HEAD`](#distill-annotate-diff-base-head)
-* [`distill annotate pr PR`](#distill-annotate-pr-pr)
+* [`distill annotate pr [PR]`](#distill-annotate-pr-pr)
 * [`distill help [COMMAND]`](#distill-help-command)
 
 ## `distill annotate diff BASE HEAD`
@@ -72,18 +72,18 @@ EXAMPLES
   $ distill annotate diff main HEAD --repo ../other-project
 ```
 
-_See code: [src/commands/annotate/diff.ts](https://github.com/zetlen/distill/blob/v1.0.2/src/commands/annotate/diff.ts)_
+_See code: [src/commands/annotate/diff.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/annotate/diff.ts)_
 
-## `distill annotate pr PR`
+## `distill annotate pr [PR]`
 
 Annotate a GitHub Pull Request
 
 ```
 USAGE
-  $ distill annotate pr PR [-c <value>] [--json] [-r <value>]
+  $ distill annotate pr [PR] [-c <value>] [--json] [-r <value>]
 
 ARGUMENTS
-  PR  PR number or URL
+  [PR]  PR number or URL (optional: detects PR for current branch if omitted)
 
 FLAGS
   -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
@@ -94,7 +94,7 @@ DESCRIPTION
   Annotate a GitHub Pull Request
 ```
 
-_See code: [src/commands/annotate/pr.ts](https://github.com/zetlen/distill/blob/v1.0.2/src/commands/annotate/pr.ts)_
+_See code: [src/commands/annotate/pr.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/annotate/pr.ts)_
 
 ## `distill help [COMMAND]`
 
