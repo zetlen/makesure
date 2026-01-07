@@ -6,12 +6,12 @@ import {Octokit} from 'octokit'
 
 const execFileAsync = promisify(execFile)
 
-import {loadConfig} from '../../lib/configuration/loader.js'
-import {parseDiff} from '../../lib/diff/parser.js'
-import {processFiles} from '../../lib/processing/runner.js'
-import {type ContentProvider} from '../../lib/processing/types.js'
+import {loadConfig} from '../lib/configuration/loader.js'
+import {parseDiff} from '../lib/diff/parser.js'
+import {processFiles} from '../lib/processing/runner.js'
+import {type ContentProvider} from '../lib/processing/types.js'
 
-export default class AnnotatePr extends Command {
+export default class PrCommand extends Command {
   static override args = {
     pr: Args.string({
       description: 'PR number or URL (optional: detects PR for current branch if omitted)',
@@ -34,7 +34,7 @@ export default class AnnotatePr extends Command {
   }
 
   public async run(): Promise<void> {
-    const {args, flags} = await this.parse(AnnotatePr)
+    const {args, flags} = await this.parse(PrCommand)
 
     const token = process.env.GITHUB_TOKEN
     if (!token) {

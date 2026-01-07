@@ -3,7 +3,7 @@ import {expect} from 'chai'
 import nock from 'nock'
 import {resolve} from 'node:path'
 
-describe('annotate:pr', () => {
+describe('pr', () => {
   const prNumber = '123'
   const repo = 'owner/repo'
   const token = 'gh_token'
@@ -21,7 +21,7 @@ describe('annotate:pr', () => {
 
   it('requires GITHUB_TOKEN', async () => {
     delete process.env.GITHUB_TOKEN
-    const {error} = await runCommand(`annotate:pr ${prNumber} --repo ${repo}`)
+    const {error} = await runCommand(`pr ${prNumber} --repo ${repo}`)
     expect(error?.message).to.contain('GITHUB_TOKEN environment variable is required')
   })
 
@@ -60,7 +60,7 @@ index 0000000..1111111 100644
       })
 
     const configPath = resolve('test/fixtures/test-config.yml')
-    const {stdout} = await runCommand(`annotate:pr ${prNumber} --repo ${repo} --config ${configPath}`)
+    const {stdout} = await runCommand(`pr ${prNumber} --repo ${repo} --config ${configPath}`)
 
     expect(stdout).to.contain('# Test Report')
     expect(stdout).to.contain('Found changes in dependencies')

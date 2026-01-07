@@ -20,7 +20,7 @@ $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/1.1.0 linux-x64 node-v24.12.0
+@distill/cli/1.1.0 darwin-arm64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
@@ -31,17 +31,17 @@ USAGE
 # Commands
 
 <!-- commands -->
-* [`distill annotate diff BASE HEAD`](#distill-annotate-diff-base-head)
-* [`distill annotate pr [PR]`](#distill-annotate-pr-pr)
+* [`distill diff BASE HEAD`](#distill-diff-base-head)
 * [`distill help [COMMAND]`](#distill-help-command)
+* [`distill pr [PR]`](#distill-pr-pr)
 
-## `distill annotate diff BASE HEAD`
+## `distill diff BASE HEAD`
 
 Annotate a git diff with semantic analysis based on configured rules.
 
 ```
 USAGE
-  $ distill annotate diff BASE HEAD [-c <value>] [--json] [-r <value>]
+  $ distill diff BASE HEAD [-c <value>] [--json] [-r <value>]
 
 ARGUMENTS
   BASE  Base commit-ish (e.g., HEAD~1, main, a1b2c3d)
@@ -63,38 +63,16 @@ DESCRIPTION
   Future versions may map these back to original source lines for supported filters (ast-grep, tsq, xpath).
 
 EXAMPLES
-  $ distill annotate diff HEAD~1 HEAD
+  $ distill diff HEAD~1 HEAD
 
-  $ distill annotate diff main feat/foo
+  $ distill diff main feat/foo
 
-  $ distill annotate diff HEAD . # compare HEAD to working directory
+  $ distill diff HEAD . # compare HEAD to working directory
 
-  $ distill annotate diff main HEAD --repo ../other-project
+  $ distill diff main HEAD --repo ../other-project
 ```
 
-_See code: [src/commands/annotate/diff.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/annotate/diff.ts)_
-
-## `distill annotate pr [PR]`
-
-Annotate a GitHub Pull Request
-
-```
-USAGE
-  $ distill annotate pr [PR] [-c <value>] [--json] [-r <value>]
-
-ARGUMENTS
-  [PR]  PR number or URL (optional: detects PR for current branch if omitted)
-
-FLAGS
-  -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
-  -r, --repo=<value>    GitHub repository (owner/repo). Required if not running in a git repo.
-      --json            Output reports in JSON format
-
-DESCRIPTION
-  Annotate a GitHub Pull Request
-```
-
-_See code: [src/commands/annotate/pr.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/annotate/pr.ts)_
+_See code: [src/commands/diff.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/diff.ts)_
 
 ## `distill help [COMMAND]`
 
@@ -115,4 +93,26 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.36/src/commands/help.ts)_
+
+## `distill pr [PR]`
+
+Annotate a GitHub Pull Request
+
+```
+USAGE
+  $ distill pr [PR] [-c <value>] [--json] [-r <value>]
+
+ARGUMENTS
+  [PR]  PR number or URL (optional: detects PR for current branch if omitted)
+
+FLAGS
+  -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
+  -r, --repo=<value>    GitHub repository (owner/repo). Required if not running in a git repo.
+      --json            Output reports in JSON format
+
+DESCRIPTION
+  Annotate a GitHub Pull Request
+```
+
+_See code: [src/commands/pr.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/pr.ts)_
 <!-- commandsstop -->

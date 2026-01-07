@@ -21,7 +21,7 @@ npm run build
 npm test
 
 # Run a single test file
-mocha --forbid-only "test/commands/annotate/diff.test.ts"
+mocha --forbid-only "test/commands/diff.test.ts"
 
 # Lint the code
 npm run lint
@@ -49,11 +49,11 @@ npm run build:docker
 ./bin/run.js <command>
 
 # Main usage: compare two commits
-./bin/run.js annotate diff HEAD~1 HEAD
-./bin/run.js annotate diff main feat/foo --config ./custom-rules.yml
+./bin/run.js diff HEAD~1 HEAD
+./bin/run.js diff main feat/foo --config ./custom-rules.yml
 
 # Output as JSON (includes metadata with lineRange and symbolic context)
-./bin/run.js annotate diff HEAD~1 HEAD --json
+./bin/run.js diff HEAD~1 HEAD --json
 ```
 
 ## Architecture
@@ -159,7 +159,7 @@ The `--json` flag outputs structured report data with enhanced metadata:
 }
 ```
 
-**Important**: The `lineRange` refers to line numbers within the *filtered artifact* (the extracted code snippet), not the original source file. This is especially relevant for filters like `jq` or `xpath` that transform the input.
+**Important**: The `lineRange` refers to line numbers within the _filtered artifact_ (the extracted code snippet), not the original source file. This is especially relevant for filters like `jq` or `xpath` that transform the input.
 
 The `context` array provides symbolic information about surrounding code structures (available for ast-grep, tsq, and regex filters), helping identify which class/function the change occurred in.
 
@@ -167,7 +167,7 @@ The `context` array provides symbolic information about surrounding code structu
 
 - `src/index.ts`: Re-exports oclif's run function (standard oclif entry point)
 - `src/commands/`: Command implementations
-  - `annotate/diff.ts`: Main command that compares commits and applies rules
+  - `diff.ts`: Main command that compares commits and applies rules
 - `src/lib/`: Core library modules
   - `configuration/`: Config types (`config.ts`) and YAML loader (`loader.ts`)
   - `diff/`: Git diff parsing and file version retrieval (`parser.ts`)
@@ -177,7 +177,7 @@ The `context` array provides symbolic information about surrounding code structu
   - `actions/`: Action implementations (report with Handlebars, JSON output)
   - `tree-sitter.ts`: Tree-sitter language parsers and utilities
 - `test/`: Mocha/Chai tests using `@oclif/test`
-  - `test/commands/annotate/`: Command tests (diff.test.ts, diff-json.test.ts)
+  - `test/commands/`: Command tests (diff.test.ts, diff-json.test.ts)
   - `test/lib/filters/`: Individual test files per filter type
   - `test/fixtures/`: Test fixture files for various languages
 - `bin/`: CLI executables (`dev.js` for development, `run.js` for production)

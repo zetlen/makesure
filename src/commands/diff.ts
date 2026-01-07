@@ -3,14 +3,14 @@ import {execFile} from 'node:child_process'
 import {join, resolve} from 'node:path'
 import {promisify} from 'node:util'
 
-import {loadConfig} from '../../lib/configuration/loader.js'
-import {parseDiff, type RefPair} from '../../lib/diff/parser.js'
-import {processFiles} from '../../lib/processing/runner.js'
-import {type ContentProvider} from '../../lib/processing/types.js'
+import {loadConfig} from '../lib/configuration/loader.js'
+import {parseDiff, type RefPair} from '../lib/diff/parser.js'
+import {processFiles} from '../lib/processing/runner.js'
+import {type ContentProvider} from '../lib/processing/types.js'
 
 const execFileAsync = promisify(execFile)
 
-export default class AnnotateDiff extends Command {
+export default class DiffCommand extends Command {
   static override args = {
     base: Args.string({
       description: 'Base commit-ish (e.g., HEAD~1, main, a1b2c3d)',
@@ -49,7 +49,7 @@ export default class AnnotateDiff extends Command {
   }
 
   public async run(): Promise<void> {
-    const {args, flags} = await this.parse(AnnotateDiff)
+    const {args, flags} = await this.parse(DiffCommand)
 
     // Resolve repository path
     const repoPath = flags.repo ? resolve(process.cwd(), flags.repo) : await this.getGitToplevel(process.cwd())
