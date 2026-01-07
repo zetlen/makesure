@@ -1,62 +1,78 @@
-import {Args, Command, Flags} from '@oclif/core'
+import {Args, Flags} from '@oclif/core'
 import {execFile} from 'node:child_process'
 import {join, resolve} from 'node:path'
 import {promisify} from 'node:util'
 
+import {BaseCommand, type JsonOutput} from '../lib/base-command.js'
 import {loadConfig} from '../lib/configuration/loader.js'
 import {parseDiff, type RefPair} from '../lib/diff/parser.js'
+import {getGitDiff, getGitToplevel, getWorkingTreeStatus, isValidRef} from '../lib/git/index.js'
 import {processFiles} from '../lib/processing/runner.js'
 import {type ContentProvider} from '../lib/processing/types.js'
 
 const execFileAsync = promisify(execFile)
 
-export default class DiffCommand extends Command {
+interface ResolvedRefs {
+  base: string
+  diffOptions: {staged?: boolean}
+  head: string
+}
+
+export default class DiffCommand extends BaseCommand<typeof DiffCommand> {
   static override args = {
     base: Args.string({
-      description: 'Base commit-ish (e.g., HEAD~1, main, a1b2c3d)',
-      required: true,
+      description: 'Base commit-ish (e.g., HEAD~1, main). Defaults based on working tree state.',
+      required: false,
     }),
     head: Args.string({
-      description: 'Head commit-ish (e.g., HEAD, feat/foo, . for working directory)',
-      required: true,
+      description: 'Head commit-ish (e.g., HEAD, feat/foo, . for working directory). Defaults to "."',
+      required: false,
     }),
   }
   static override description = `Annotate a git diff with semantic analysis based on configured rules.
-  
-  When using --json, a "lineRange" field is included. Note that this range refers to the line numbers within the *filtered artifact* (the code snippet shown in the report), NOT the original source file.
-  
-  Future versions may map these back to original source lines for supported filters (ast-grep, tsq, xpath).`
+
+When no arguments are provided, defaults are chosen based on the working tree state:
+- If there are unstaged changes, compares HEAD to the working directory
+- If there are only staged changes, use --staged to check them
+
+When using --json, a "lineRange" field is included. Note that this range refers to the line numbers within the *filtered artifact* (the code snippet shown in the report), NOT the original source file.`
   static override examples = [
+    '<%= config.bin %> <%= command.id %>                  # auto-detect changes',
+    '<%= config.bin %> <%= command.id %> --staged         # check staged changes only',
     '<%= config.bin %> <%= command.id %> HEAD~1 HEAD',
     '<%= config.bin %> <%= command.id %> main feat/foo',
-    '<%= config.bin %> <%= command.id %> HEAD . # compare HEAD to working directory',
+    '<%= config.bin %> <%= command.id %> HEAD .           # compare HEAD to working directory',
     '<%= config.bin %> <%= command.id %> main HEAD --repo ../other-project',
   ]
   static override flags = {
-    config: Flags.string({
-      char: 'c',
-      description: 'Path to the distill configuration file (default: distill.yml in repo root)',
-    }),
-    json: Flags.boolean({
-      description:
-        'Output reports in JSON format. Note: "lineRange" in metadata is relative to the filtered artifact, not necessarily the original source file. For some filters (like jq/xpath), exact source line mapping may be approximate.',
-    }),
     repo: Flags.string({
       char: 'r',
       defaultHelp: 'Find the closest top-level git repo to the current directory',
       description: 'Path to git repository',
     }),
+    staged: Flags.boolean({
+      char: 's',
+      default: false,
+      description: 'Only check staged changes (when comparing with working directory)',
+    }),
   }
 
-  public async run(): Promise<void> {
-    const {args, flags} = await this.parse(DiffCommand)
-
+  public async run(): Promise<JsonOutput | void> {
     // Resolve repository path
-    const repoPath = flags.repo ? resolve(process.cwd(), flags.repo) : await this.getGitToplevel(process.cwd())
+    const repoPath = this.flags.repo ? resolve(process.cwd(), this.flags.repo) : await getGitToplevel(process.cwd())
     this.debug('found repo path', repoPath)
 
+    // Resolve refs using smart defaults
+    const {base, diffOptions, head} = await this.resolveRefs(
+      this.args.base,
+      this.args.head,
+      repoPath,
+      this.flags.staged,
+    )
+    this.debug('resolved refs', {base, diffOptions, head})
+
     // Resolve config path (default to distill.yml in repo root)
-    const configPath = flags.config ? resolve(process.cwd(), flags.config) : join(repoPath, 'distill.yml')
+    const configPath = this.flags.config ? resolve(process.cwd(), this.flags.config) : join(repoPath, 'distill.yml')
     this.debug('found config path', configPath)
 
     // Load configuration
@@ -64,33 +80,31 @@ export default class DiffCommand extends Command {
     this.debug('loaded config', config)
 
     // Generate diff using git
-    const diffText = await this.getGitDiff(args.base, args.head, repoPath)
+    const diffText = await getGitDiff(base, head, repoPath, diffOptions)
     if (!diffText.trim()) {
-      if (flags.json) {
-        this.log('[]')
-      } else {
-        this.log('No changes between %s and %s', args.base, args.head)
+      if (this.jsonEnabled()) {
+        return []
       }
 
+      this.log('No changes between %s and %s', base, head)
       return
     }
 
     // Parse the diff
     const {files} = parseDiff(diffText)
     if (files.length === 0) {
-      if (flags.json) {
-        this.log('[]')
-      } else {
-        this.log('No files found in diff')
+      if (this.jsonEnabled()) {
+        return []
       }
 
+      this.log('No files found in diff')
       return
     }
 
     this.debug('Files in diff:', files)
 
     // Process all files and collect reports
-    const refs: RefPair = {base: args.base, head: args.head}
+    const refs: RefPair = {base, head}
 
     // Create a content provider backed by git show
     const contentProvider: ContentProvider = async (ref, path) => {
@@ -108,33 +122,76 @@ export default class DiffCommand extends Command {
       refs,
     })
 
-    // Output reports sorted by urgency (highest first)
-    reports.sort((a, b) => b.urgency - a.urgency)
+    return this.outputReports(reports)
+  }
 
-    if (flags.json) {
-      const jsonReports = reports.map(
-        (report) =>
-          report.metadata || {
-            diffText: '',
-            fileName: '', // Fallback if metadata is missing (should not happen with updated actions)
-            message: report.content,
-          },
-      )
-      this.log(JSON.stringify(jsonReports, null, 2))
-    } else {
-      for (const report of reports) {
-        this.log(report.content)
-      }
+  private async resolveRefs(
+    baseArg: string | undefined,
+    headArg: string | undefined,
+    repoPath: string,
+    stagedFlag: boolean,
+  ): Promise<ResolvedRefs> {
+    // Case: Both arguments provided - use as-is
+    if (baseArg && headArg) {
+      return {base: baseArg, diffOptions: {staged: stagedFlag}, head: headArg}
     }
-  }
 
-  private async getGitDiff(base: string, head: string, cwd: string): Promise<string> {
-    const {stdout} = await execFileAsync('git', ['diff', base, head], {cwd})
-    return stdout
-  }
+    const status = await getWorkingTreeStatus(repoPath)
 
-  private async getGitToplevel(cwd: string): Promise<string> {
-    const {stdout} = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {cwd})
-    return stdout.trim()
+    // Case: One argument provided
+    if (baseArg && !headArg) {
+      // Check if it's a ref or a path
+      const isRef = await isValidRef(baseArg, repoPath)
+      if (isRef) {
+        // 2b: Is a ref -> use HEAD as base and that ref as head
+        return {base: 'HEAD', diffOptions: {}, head: baseArg}
+      }
+
+      // 2a: Not a ref (path) -> use same logic as no args but with this path
+      // Fall through to no-args logic with pathArg set
+    }
+
+    // Case: No arguments (or single path argument)
+    const pathArg = baseArg && !(await isValidRef(baseArg, repoPath)) ? baseArg : '.'
+
+    // 1a: Clean working tree
+    if (status.isClean) {
+      this.warn(
+        'There are no changes in the working tree. Provide at least one reference to compare with the current commit.',
+      )
+      this.exit(0)
+    }
+
+    // 1c: Staged changes exist
+    if (status.hasStaged) {
+      if (stagedFlag) {
+        // 1ci: --staged supplied
+        if (status.hasUnstaged) {
+          // Log to stderr (warn goes to stderr)
+          this.warn('Checking only staged changes. Omit --staged to check unstaged changes.')
+        }
+
+        return {base: 'HEAD', diffOptions: {staged: true}, head: pathArg}
+      }
+
+      // --staged not supplied but staged changes exist
+      if (!status.hasUnstaged) {
+        // Only staged, no unstaged: warn and exit
+        this.warn('There are staged changes but no unstaged changes. Use --staged to check staged changes.')
+        this.exit(0)
+      }
+
+      // Both staged and unstaged exist, --staged not supplied
+      // Warn about staged being skipped, check unstaged
+      this.warn('Skipping staged changes. Use --staged to check them instead.')
+    }
+
+    // 1b: Unstaged changes (or both with --staged not supplied)
+    if (status.hasUnstaged) {
+      return {base: 'HEAD', diffOptions: {}, head: pathArg}
+    }
+
+    // Should not reach here, but fallback
+    return {base: 'HEAD', diffOptions: {}, head: pathArg}
   }
 }

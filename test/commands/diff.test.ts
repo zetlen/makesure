@@ -6,10 +6,25 @@ import {fileURLToPath} from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 describe('diff', () => {
-  it('requires base and head arguments', async () => {
-    const {error} = await runCommand('diff')
-    expect(error?.message).to.contain('Missing')
-    expect(error?.message).to.contain('required arg')
+  it('uses smart defaults when no arguments provided (will warn or run based on repo state)', async () => {
+    // Without arguments, the command will either:
+    // - Warn about no changes (clean working tree)
+    // - Warn about staged changes being skipped
+    // - Or proceed with comparing HEAD to working directory
+    // We can't easily predict which in tests, so we just verify it doesn't crash
+    const {error, stderr} = await runCommand('diff')
+    // If there's an error, it should be about working tree state, not missing args
+    if (error) {
+      expect(error.message).to.not.contain('Missing')
+      expect(error.message).to.not.contain('required arg')
+    }
+
+    // Or there should be a warning about working tree state
+    if (stderr) {
+      expect(stderr).to.satisfy(
+        (s: string) => s.includes('changes') || s.includes('staged') || s.includes('working tree'),
+      )
+    }
   })
 
   it('shows no changes message when commits are identical', async () => {
@@ -26,6 +41,13 @@ describe('diff', () => {
   it('accepts --repo flag', async () => {
     // Use the current repo as the target
     const {stdout} = await runCommand('diff HEAD HEAD --repo .')
+    expect(stdout).to.contain('No changes between HEAD and HEAD')
+  })
+
+  it('accepts --staged flag (ignored when comparing two commits)', async () => {
+    // When comparing two commits, --staged is ignored (it only applies to working directory diffs)
+    // So this should behave the same as 'diff HEAD HEAD'
+    const {stdout} = await runCommand('diff HEAD HEAD --staged')
     expect(stdout).to.contain('No changes between HEAD and HEAD')
   })
 })

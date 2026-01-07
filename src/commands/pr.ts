@@ -1,41 +1,46 @@
-import {Args, Command, Flags} from '@oclif/core'
-import {execFile} from 'node:child_process'
+import {Args, Flags} from '@oclif/core'
 import {resolve} from 'node:path'
-import {promisify} from 'node:util'
 import {Octokit} from 'octokit'
 
-const execFileAsync = promisify(execFile)
-
+import {BaseCommand, type JsonOutput} from '../lib/base-command.js'
 import {loadConfig} from '../lib/configuration/loader.js'
 import {parseDiff} from '../lib/diff/parser.js'
+import {getCurrentBranch, getRemotes, getTrackingBranch, isInsideGitRepo} from '../lib/git/index.js'
 import {processFiles} from '../lib/processing/runner.js'
 import {type ContentProvider} from '../lib/processing/types.js'
 
-export default class PrCommand extends Command {
+interface PrInfo {
+  number: number
+  owner: string
+  remoteUrl?: string
+  repo: string
+}
+
+export default class PrCommand extends BaseCommand<typeof PrCommand> {
   static override args = {
     pr: Args.string({
       description: 'PR number or URL (optional: detects PR for current branch if omitted)',
       required: false,
     }),
   }
-  static override description = 'Annotate a GitHub Pull Request'
+  static override description = `Annotate a GitHub Pull Request.
+
+When no argument is provided, detects the PR associated with the current branch.
+Requires GITHUB_TOKEN environment variable for authentication.`
+  static override examples = [
+    '<%= config.bin %> <%= command.id %>                                # auto-detect PR for current branch',
+    '<%= config.bin %> <%= command.id %> 123                            # PR number (uses detected remote)',
+    '<%= config.bin %> <%= command.id %> https://github.com/owner/repo/pull/123',
+    '<%= config.bin %> <%= command.id %> 123 --repo owner/repo',
+  ]
   static override flags = {
-    config: Flags.string({
-      char: 'c',
-      description: 'Path to the distill configuration file (default: distill.yml in repo root)',
-    }),
-    json: Flags.boolean({
-      description: 'Output reports in JSON format',
-    }),
     repo: Flags.string({
       char: 'r',
       description: 'GitHub repository (owner/repo). Required if not running in a git repo.',
     }),
   }
 
-  public async run(): Promise<void> {
-    const {args, flags} = await this.parse(PrCommand)
-
+  public async run(): Promise<JsonOutput | void> {
     const token = process.env.GITHUB_TOKEN
     if (!token) {
       this.error('GITHUB_TOKEN environment variable is required')
@@ -43,9 +48,16 @@ export default class PrCommand extends Command {
 
     const octokit = new Octokit({auth: token})
 
-    const {number, owner, repo} = args.pr
-      ? await this.parsePrArg(args.pr, flags.repo)
-      : await this.detectCurrentBranchPr(octokit, flags.repo)
+    // Detect context based on args
+    const prInfo = this.args.pr ? await this.parsePrArg(this.args.pr, octokit) : await this.detectPrFromContext(octokit)
+
+    const {number, owner, repo} = prInfo
+
+    // Log the remote being used if it was auto-detected
+    if (prInfo.remoteUrl) {
+      this.log(`Using remote ${prInfo.remoteUrl}`)
+    }
+
     this.debug('parsed pr', {number, owner, repo})
 
     // Fetch PR details to get refs
@@ -63,16 +75,10 @@ export default class PrCommand extends Command {
     }
     this.debug('found refs', refs)
 
-    // Fetch config - currently purely local, but could be fetched remotely in future
-    // For now, require local config or assume defaults if we were to support that
-    // The plan said: "Allow local config override... Let's stick to local config for the rule definitions for now"
-    const configPath = flags.config ? resolve(process.cwd(), flags.config) : resolve(process.cwd(), 'distill.yml')
-
-    // We intentionally don't error immediately if config is missing,
-    // loadConfig might throw or handle it.
-    // However, since we are moving towards "remote" execution,
-    // we should consider if we strictly need a local config.
-    // The plan said: "Allow local config override... Let's stick to local config for the rule definitions for now"
+    // Fetch config - currently purely local
+    const configPath = this.flags.config
+      ? resolve(process.cwd(), this.flags.config)
+      : resolve(process.cwd(), 'distill.yml')
     const config = await loadConfig(configPath)
 
     // Fetch Diff
@@ -91,12 +97,11 @@ export default class PrCommand extends Command {
     const diffString = diffText as unknown as string
 
     if (!diffString.trim()) {
-      if (flags.json) {
-        this.log('[]')
-      } else {
-        this.log('No changes found in PR #%d', number)
+      if (this.jsonEnabled()) {
+        return []
       }
 
+      this.log('No changes found in PR #%d', number)
       return
     }
 
@@ -115,8 +120,6 @@ export default class PrCommand extends Command {
         if ('content' in data && 'encoding' in data && data.encoding === 'base64') {
           return Buffer.from(data.content, 'base64').toString('utf8')
         }
-        // If it's not base64 or doesn't have content (e.g. submodule or directory), we might need to handle it
-        // For text files, it's usually base64
 
         return null
       } catch (error) {
@@ -130,70 +133,60 @@ export default class PrCommand extends Command {
       refs,
     })
 
-    // Output reports
-    reports.sort((a, b) => b.urgency - a.urgency)
-
-    if (flags.json) {
-      const jsonReports = reports.map(
-        (report) =>
-          report.metadata || {
-            diffText: '',
-            fileName: '',
-            message: report.content,
-          },
-      )
-      this.log(JSON.stringify(jsonReports, null, 2))
-    } else {
-      for (const report of reports) {
-        this.log(report.content)
-      }
-    }
+    return this.outputReports(reports)
   }
 
-  private async detectCurrentBranchPr(
-    octokit: Octokit,
-    repoFlag?: string,
-  ): Promise<{number: number; owner: string; repo: string}> {
-    // Get current branch
-    let branch: string
-    try {
-      const {stdout} = await execFileAsync('git', ['branch', '--show-current'])
-      branch = stdout.trim()
-      if (!branch) {
-        throw new Error('Not on a branch (detached HEAD?)')
-      }
-    } catch {
-      throw new Error('Could not detect current branch. Please provide a PR number or URL.')
+  private async detectPrFromContext(octokit: Octokit): Promise<PrInfo> {
+    const cwd = process.cwd()
+
+    // 1a: Check if we're in a git repo
+    if (!(await isInsideGitRepo(cwd))) {
+      this.error(
+        'Not inside a git repository. Please provide a full PR URL (e.g., https://github.com/owner/repo/pull/123)',
+      )
     }
 
-    // Get repo info
-    let owner: string
-    let repo: string
-    if (repoFlag) {
-      const parts = repoFlag.split('/')
-      if (parts.length !== 2 || !parts[0] || !parts[1]) {
-        throw new TypeError('Invalid repo format. Expected owner/repo')
-      }
+    // Get GitHub remotes
+    const remotes = await getRemotes(cwd)
+    const githubRemotes = remotes.filter((r) => r.isGitHub)
 
-      ;[owner, repo] = parts
-    } else {
-      try {
-        const {stdout} = await execFileAsync('git', ['remote', 'get-url', 'origin'])
-        const match = stdout.match(/github\.com[:/]([^/]+)\/([^/.]+)/)
-        if (!match) {
-          throw new Error('Could not parse GitHub remote URL')
-        }
+    // 1b: No GitHub remotes
+    if (githubRemotes.length === 0) {
+      this.error('No GitHub remotes found. Please configure a GitHub remote or provide a full PR URL.')
+    }
 
-        owner = match[1]
-        repo = match[2].replace(/\.git$/, '')
-      } catch {
-        throw new Error('Could not detect GitHub repo. Please provide --repo flag or a PR number/URL.')
-      }
+    // Warn if multiple GitHub remotes
+    if (githubRemotes.length > 1) {
+      this.warn(
+        `Multiple GitHub remotes found: ${githubRemotes.map((r) => r.name).join(', ')}. Using '${githubRemotes[0].name}'.`,
+      )
+    }
+
+    const remote = githubRemotes[0]
+    const {owner, repo} = remote
+
+    if (!owner || !repo) {
+      this.error('Could not parse GitHub owner/repo from remote URL. Please provide a full PR URL.')
+    }
+
+    // Get current branch
+    const branch = await getCurrentBranch(cwd)
+    if (!branch) {
+      this.error('Not on a branch (detached HEAD). Please checkout a branch or provide a PR number/URL.')
+    }
+
+    // 1c: Check for tracking branch
+    const tracking = await getTrackingBranch(cwd)
+    if (!tracking) {
+      this.error(
+        `There is no remote tracking branch associated with '${branch}', so a PR could not be deduced. ` +
+          `Push your branch with 'git push -u ${remote.name} ${branch}' or provide a PR number/URL.`,
+      )
     }
 
     this.debug('detecting PR for branch', {branch, owner, repo})
 
-    // Find PR for current branch
+    // 1d/1e: Find PR for this branch
     const {data: prs} = await octokit.rest.pulls.list({
       head: `${owner}:${branch}`,
       owner,
@@ -202,54 +195,92 @@ export default class PrCommand extends Command {
     })
 
     if (prs.length === 0) {
-      throw new Error(`No open PR found for branch '${branch}' in ${owner}/${repo}`)
-    }
-
-    // Use the first (most recent) PR
-    const pr = prs[0]
-    this.debug('found PR for current branch', {number: pr.number, title: pr.title})
-
-    return {number: pr.number, owner, repo}
-  }
-
-  private async parsePrArg(prArg: string, repoFlag?: string): Promise<{number: number; owner: string; repo: string}> {
-    // Check if it's a URL
-    if (prArg.startsWith('https://github.com/') || prArg.startsWith('http://github.com/')) {
-      const match = prArg.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
-      if (match) {
-        return {number: Number.parseInt(match[3], 10), owner: match[1], repo: match[2]}
-      }
-
-      throw new TypeError(`Invalid GitHub PR URL format: ${prArg}`)
-    }
-
-    const number = Number.parseInt(prArg, 10)
-    if (Number.isNaN(number)) {
-      throw new TypeError(`Invalid PR argument: ${prArg}`)
-    }
-
-    if (!repoFlag) {
-      // Try to detect from git remote
-      try {
-        const {stdout} = await execFileAsync('git', ['remote', 'get-url', 'origin'])
-        const match = stdout.match(/github\.com[:/]([^/]+)\/([^/.]+)/)
-        if (match) {
-          return {number, owner: match[1], repo: match[2].replace(/\.git$/, '')}
-        }
-      } catch {
-        // Fall through to error
-      }
-
-      throw new Error(
-        'Repo flag is required when PR argument is a number and not running in a git repo with a GitHub remote',
+      this.error(
+        `The current branch '${branch}' is not associated with a pull request at ${owner}/${repo}. ` +
+          `Create a PR or provide a PR number/URL.`,
       )
     }
 
-    const [owner, repo] = repoFlag.split('/')
-    if (!owner || !repo) {
-      throw new TypeError('Invalid repo format. Expected owner/repo')
+    const pr = prs[0]
+    this.debug('found PR for current branch', {number: pr.number, title: pr.title})
+
+    return {
+      number: pr.number,
+      owner,
+      remoteUrl: remote.url,
+      repo,
+    }
+  }
+
+  private async parsePrArg(prArg: string, octokit: Octokit): Promise<PrInfo> {
+    const cwd = process.cwd()
+
+    // Full URL format
+    if (prArg.startsWith('https://github.com/') || prArg.startsWith('http://github.com/')) {
+      const match = prArg.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
+      if (match) {
+        // Verify we can authenticate to this repo
+        const owner = match[1]
+        const repo = match[2]
+        const number = Number.parseInt(match[3], 10)
+
+        try {
+          await octokit.rest.repos.get({owner, repo})
+        } catch {
+          this.error(`Cannot access repository ${owner}/${repo}. Check that GITHUB_TOKEN has access.`)
+        }
+
+        return {number, owner, repo}
+      }
+
+      this.error(`Invalid GitHub PR URL format: ${prArg}`)
     }
 
-    return {number, owner, repo}
+    // PR number format - need repo context
+    const number = Number.parseInt(prArg, 10)
+    if (Number.isNaN(number)) {
+      this.error(`Invalid PR argument: ${prArg}. Expected a PR number or URL.`)
+    }
+
+    // Try to get repo from --repo flag first
+    if (this.flags.repo) {
+      const [owner, repo] = this.flags.repo.split('/')
+      if (!owner || !repo) {
+        this.error('Invalid --repo format. Expected owner/repo')
+      }
+
+      return {number, owner, repo}
+    }
+
+    // 1a for arg provided: Not in git repo
+    if (!(await isInsideGitRepo(cwd))) {
+      this.error(`PR number '${number}' provided but not in a git repository. Provide a full URL or use --repo flag.`)
+    }
+
+    // Try to detect from remotes
+    const remotes = await getRemotes(cwd)
+    const githubRemotes = remotes.filter((r) => r.isGitHub)
+
+    if (githubRemotes.length === 0) {
+      this.error(`PR number '${number}' provided but no GitHub remotes found. Provide a full URL or use --repo flag.`)
+    }
+
+    if (githubRemotes.length > 1) {
+      this.warn(
+        `Multiple GitHub remotes found: ${githubRemotes.map((r) => r.name).join(', ')}. Using '${githubRemotes[0].name}'.`,
+      )
+    }
+
+    const remote = githubRemotes[0]
+    if (!remote.owner || !remote.repo) {
+      this.error('Could not parse GitHub owner/repo from remote URL. Please provide a full PR URL or use --repo flag.')
+    }
+
+    return {
+      number,
+      owner: remote.owner,
+      remoteUrl: remote.url,
+      repo: remote.repo,
+    }
   }
 }

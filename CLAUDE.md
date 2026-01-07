@@ -48,12 +48,20 @@ npm run build:docker
 # After building
 ./bin/run.js <command>
 
-# Main usage: compare two commits
-./bin/run.js diff HEAD~1 HEAD
+# Diff command with smart defaults
+./bin/run.js diff                    # auto-detect changes in working tree
+./bin/run.js diff --staged           # check only staged changes
+./bin/run.js diff HEAD~1 HEAD        # compare two commits
 ./bin/run.js diff main feat/foo --config ./custom-rules.yml
+
+# PR command with smart defaults
+./bin/run.js pr                      # auto-detect PR for current branch
+./bin/run.js pr 123                  # PR number (uses detected remote)
+./bin/run.js pr https://github.com/owner/repo/pull/123
 
 # Output as JSON (includes metadata with lineRange and symbolic context)
 ./bin/run.js diff HEAD~1 HEAD --json
+./bin/run.js pr 123 --json
 ```
 
 ## Architecture
@@ -167,20 +175,46 @@ The `context` array provides symbolic information about surrounding code structu
 
 - `src/index.ts`: Re-exports oclif's run function (standard oclif entry point)
 - `src/commands/`: Command implementations
-  - `diff.ts`: Main command that compares commits and applies rules
+  - `diff.ts`: Compares commits/working tree and applies rules (extends BaseCommand)
+  - `pr.ts`: Analyzes GitHub PRs via API (extends BaseCommand)
 - `src/lib/`: Core library modules
+  - `base-command.ts`: Abstract base command with shared flags and `enableJsonFlag`
   - `configuration/`: Config types (`config.ts`) and YAML loader (`loader.ts`)
   - `diff/`: Git diff parsing and file version retrieval (`parser.ts`)
+  - `git/`: Git utilities for working tree status, remote detection, etc.
+    - `utils.ts`: Functions for `getWorkingTreeStatus`, `isValidRef`, `getRemotes`, etc.
+    - `index.ts`: Re-exports
   - `filters/`: Filter implementations (jq, regex, xpath, tsq, ast-grep)
     - `types.ts`: FilterResult interface with lineRange and context metadata
     - `utils.ts`: Shared utilities for extracting symbolic context
   - `actions/`: Action implementations (report with Handlebars, JSON output)
+  - `processing/`: Processing runner and types for ContentProvider abstraction
   - `tree-sitter.ts`: Tree-sitter language parsers and utilities
 - `test/`: Mocha/Chai tests using `@oclif/test`
-  - `test/commands/`: Command tests (diff.test.ts, diff-json.test.ts)
+  - `test/commands/`: Command tests (diff.test.ts, diff-json.test.ts, pr.test.ts)
   - `test/lib/filters/`: Individual test files per filter type
   - `test/fixtures/`: Test fixture files for various languages
 - `bin/`: CLI executables (`dev.js` for development, `run.js` for production)
+
+### Command Architecture
+
+Commands extend `BaseCommand` from `src/lib/base-command.ts`, which provides:
+
+- **`enableJsonFlag = true`**: Adds `--json` as a global flag; commands return data for JSON output
+- **`baseFlags`**: Shared flags (`--config`) inherited by all commands
+- **`outputReports()`**: Shared method for outputting reports (returns JSON data or logs text)
+
+**Smart Defaults Pattern** (diff command):
+
+- When no arguments provided, detects working tree state via `src/lib/git/utils.ts`
+- `--staged` flag for checking only staged changes
+- Single argument is checked with `isValidRef()` to determine if it's a ref or path
+
+**Remote Detection Pattern** (pr command):
+
+- Uses `getRemotes()` to find GitHub remotes
+- `getTrackingBranch()` and `getCurrentBranch()` for branch detection
+- Logs "Using remote <url>" when auto-detecting
 
 ### TypeScript Configuration
 
@@ -238,12 +272,19 @@ When making changes, these files often need to be updated together:
    - `test/lib/filters/filter-<name>.test.ts` - Add tests
    - `CLAUDE.md` - Update filter table and examples
 
-2. **Changing command interface**:
+2. **Adding a new command**:
+   - `src/commands/<name>.ts` - Extend `BaseCommand`, implement `run()` returning `JsonOutput | void`
+   - Inherit `baseFlags` automatically; add command-specific flags
+   - For JSON output, return data from `run()` when `this.jsonEnabled()`
+   - Run `npm run prepack` to update README
+   - Add tests in `test/commands/<name>.test.ts`
+
+3. **Changing command interface**:
    - `src/commands/**/*.ts` - Update args/flags
    - Run `npm run prepack` to update README
    - Update examples in command description
 
-3. **Modifying configuration schema**:
+4. **Modifying configuration schema**:
    - `src/lib/configuration/config.ts` - Update types
    - Run `npm run generate-schema`
    - Update `distill.yml` if needed
