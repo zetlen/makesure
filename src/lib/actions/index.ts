@@ -56,6 +56,33 @@ export function executeReportAction(
   }
 }
 
+export interface UpdateConcernContextAction {
+  set: Record<string, string>
+}
+
+/**
+ * Execute an update concern context action.
+ * Returns the updates to be applied to the concern context.
+ */
+export function executeUpdateConcernContextAction(
+  action: UpdateConcernContextAction,
+  filterResult: FilterResult,
+  context: {filePath: string},
+): Record<string, string> {
+  const updates: Record<string, string> = {}
+  for (const [key, valueTemplate] of Object.entries(action.set)) {
+    const template = Handlebars.compile(valueTemplate)
+    updates[key] = template({
+      diffText: new Handlebars.SafeString(filterResult.diffText),
+      filePath: context.filePath,
+      left: {artifact: new Handlebars.SafeString(filterResult.left.artifact)},
+      right: {artifact: new Handlebars.SafeString(filterResult.right.artifact)},
+    })
+  }
+
+  return updates
+}
+
 /**
  * Check if an action is a report action.
  */
@@ -65,5 +92,17 @@ export function isReportAction(action: unknown): action is ReportAction {
     action !== null &&
     'template' in action &&
     typeof (action as ReportAction).template === 'string'
+  )
+}
+
+/**
+ * Check if an action is an update concern context action.
+ */
+export function isUpdateConcernContextAction(action: unknown): action is UpdateConcernContextAction {
+  return (
+    typeof action === 'object' &&
+    action !== null &&
+    'set' in action &&
+    typeof (action as UpdateConcernContextAction).set === 'object'
   )
 }

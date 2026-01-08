@@ -121,6 +121,7 @@ When using --json, a "lineRange" field is included. Note that this range refers 
     }
 
     const reports = await processFiles(files, config, {
+      concerns: {},
       contentProvider,
       refs,
     })
@@ -154,18 +155,19 @@ When using --json, a "lineRange" field is included. Note that this range refers 
       // Check if it's a ref or a path
       const isRef = await isValidRef(baseArg, repoPath)
       if (isRef) {
-        // 2b: Is a ref -> use HEAD as base and that ref as head
+        // Single ref provided -> compare HEAD to that ref
         return {base: 'HEAD', diffOptions: {}, head: baseArg}
       }
 
-      // 2a: Not a ref (path) -> use same logic as no args but with this path
-      // Fall through to no-args logic with pathArg set
+      // Argument is not a valid ref, so treat it as a path.
+      // Fall through to no-args logic below, which will use this path
+      // instead of "." when constructing the diff command.
     }
 
     // Case: No arguments (or single path argument)
     const pathArg = baseArg && !(await isValidRef(baseArg, repoPath)) ? baseArg : '.'
 
-    // 1a: Clean working tree
+    // 1a: Clean working tree - return null to signal early exit
     if (status.isClean) {
       this.warn(
         'There are no changes in the working tree. Provide at least one reference to compare with the current commit.',
@@ -187,7 +189,7 @@ When using --json, a "lineRange" field is included. Note that this range refers 
 
       // --staged not supplied but staged changes exist
       if (!status.hasUnstaged) {
-        // Only staged, no unstaged: warn and return null (caller exits gracefully)
+        // Only staged, no unstaged: return null to signal early exit
         this.warn('There are staged changes but no unstaged changes. Use --staged to check staged changes.')
         return null
       }

@@ -105,6 +105,21 @@
                 },
                 "required": ["args", "command", "env"],
                 "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "description": "An action that updates the shared context of the concerns attached to the checkset.",
+                "properties": {
+                  "set": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Key-value pairs to set in the concern context. Values can be Handlebars templates which receive a FilterResult as evaluation context.",
+                    "type": "object"
+                  }
+                },
+                "required": ["set"],
+                "type": "object"
               }
             ],
             "description": "Union type of all supported actions."
@@ -122,6 +137,43 @@
       "required": ["actions", "filters"],
       "type": "object"
     },
+    "Concern": {
+      "additionalProperties": false,
+      "description": "A concern represents a specific area of interest or domain in the project. Checksets can be attached to concerns to group related checks.",
+      "properties": {
+        "stakeholders": {
+          "description": "List of stakeholders associated with this concern.",
+          "items": {
+            "$ref": "#/definitions/Stakeholder"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["stakeholders"],
+      "type": "object"
+    },
+    "DistillConfig": {
+      "additionalProperties": false,
+      "description": "Root configuration interface for distill.yml files. Defines all the checksets for processing git diffs.",
+      "properties": {
+        "checksets": {
+          "description": "List of file checksets that define how to process different types of files.",
+          "items": {
+            "$ref": "#/definitions/FileCheckset"
+          },
+          "type": "array"
+        },
+        "concerns": {
+          "additionalProperties": {
+            "$ref": "#/definitions/Concern"
+          },
+          "description": "Dictionary of concerns defined in the project. Keys are concern IDs.",
+          "type": "object"
+        }
+      },
+      "required": ["checksets"],
+      "type": "object"
+    },
     "FileCheckset": {
       "additionalProperties": false,
       "description": "Files matching the glob pattern will have the checks applied to them.",
@@ -130,6 +182,13 @@
           "description": "List of checks to apply to files matching the pattern.",
           "items": {
             "$ref": "#/definitions/Check"
+          },
+          "type": "array"
+        },
+        "concerns": {
+          "description": "List of concern IDs that this checkset is attached to.",
+          "items": {
+            "type": "string"
           },
           "type": "array"
         },
@@ -183,21 +242,6 @@
       "required": ["query", "type"],
       "type": "object"
     },
-    "DistillConfig": {
-      "additionalProperties": false,
-      "description": "Root configuration interface for distill.yml files. Defines all the checksets for processing git diffs.",
-      "properties": {
-        "checksets": {
-          "description": "List of file checksets that define how to process different types of files.",
-          "items": {
-            "$ref": "#/definitions/FileCheckset"
-          },
-          "type": "array"
-        }
-      },
-      "required": ["checksets"],
-      "type": "object"
-    },
     "RegexFilterConfig": {
       "additionalProperties": false,
       "description": "Configuration for the regex filter. Extracts content matching a regular expression pattern.",
@@ -220,6 +264,29 @@
       },
       "required": ["pattern", "type"],
       "type": "object"
+    },
+    "Stakeholder": {
+      "additionalProperties": false,
+      "description": "A stakeholder interested in a set of concerns.",
+      "properties": {
+        "contactMethod": {
+          "description": "How to contact the stakeholder. Examples: \"github-comment-mention\", \"github-reviewer-request\", \"github-assign\", \"webhook\".",
+          "type": "string"
+        },
+        "description": {
+          "description": "A description of the stakeholder's role or interest.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the stakeholder (e.g. a team or person).",
+          "type": "string"
+        }
+      },
+      "required": ["contactMethod", "name"],
+      "type": "object"
+    },
+    "SupportedExtension": {
+      "type": ["string"]
     },
     "TsqFilterConfig": {
       "additionalProperties": false,
@@ -249,25 +316,7 @@
       "type": "object"
     },
     "TsqSupportedExtension": {
-      "description": "Supported file extensions for tree-sitter language detection.",
-      "enum": [
-        ".c",
-        ".cpp",
-        ".cxx",
-        ".go",
-        ".h",
-        ".hpp",
-        ".java",
-        ".js",
-        ".json",
-        ".jsx",
-        ".mjs",
-        ".py",
-        ".rs",
-        ".ts",
-        ".tsx"
-      ],
-      "type": "string"
+      "$ref": "#/definitions/SupportedExtension"
     },
     "XPathFilterConfig": {
       "additionalProperties": false,

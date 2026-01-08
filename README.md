@@ -31,6 +31,54 @@ USAGE
 
 <!-- usagestop -->
 
+# Configuration
+
+`distill` is configured via a `distill.yml` file in your repository root. You can define "checksets" to apply rules to specific files, and optionally group them by "concerns" to notify relevant "stakeholders".
+
+## Concerns and Stakeholders
+
+You can define high-level **concerns** (e.g., "security", "ui-consistency") and map them to **stakeholders** (teams or individuals). Checksets can then be attached to these concerns.
+
+```yaml
+concerns:
+  security:
+    stakeholders:
+      - name: Security Team
+        contactMethod: github-reviewer-request
+        description: Reviews security-sensitive changes
+  ui-consistency:
+    stakeholders:
+      - name: Design System Team
+        contactMethod: github-comment-mention
+
+checksets:
+  - include: 'src/auth/**/*.ts'
+    concerns: ['security']
+    checks:
+      - filters:
+          - type: regex
+            pattern: 'password|secret'
+        actions:
+          - template: 'Potential secret exposure in {{filePath}}'
+            urgency: 10
+          # Update the shared context for this concern
+          - set:
+              hasSecrets: 'true'
+
+  - include: 'src/components/**/*.tsx'
+    concerns: ['ui-consistency']
+    checks:
+      - filters:
+          - type: ast-grep
+            language: tsx
+            pattern:
+              context: 'style={{...}}'
+              selector: 'jsx_attribute'
+        actions:
+          - template: 'Avoid inline styles in {{filePath}}. Use standard classes.'
+            urgency: 5
+```
+
 # Commands
 
 <!-- commands -->

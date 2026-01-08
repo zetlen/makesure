@@ -38,7 +38,8 @@ describe('git utils', () => {
     it('returns the git repository root', async () => {
       await initGitRepo()
       const result = await getGitToplevel(tempDir)
-      expect(result).to.equal(tempDir)
+      const resolvedTemp = await realpath(tempDir)
+      expect(result).to.equal(resolvedTemp)
     })
 
     it('throws user-friendly error when not in a git repo', async () => {

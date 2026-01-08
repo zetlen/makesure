@@ -5,7 +5,12 @@ import type {Check, DistillConfig, FileCheckset} from '../configuration/config.j
 import type {File, FileVersions} from '../diff/parser.js'
 import type {ProcessingContext} from './types.js'
 
-import {executeReportAction, isReportAction} from '../actions/index.js'
+import {
+  executeReportAction,
+  executeUpdateConcernContextAction,
+  isReportAction,
+  isUpdateConcernContextAction,
+} from '../actions/index.js'
 import {applyFilter, type FilterResult} from '../filters/index.js'
 
 export async function processFiles(
@@ -38,14 +43,27 @@ async function processRuleset(ruleset: FileCheckset, file: File, context: Proces
 
   for (const rule of ruleset.checks) {
     // eslint-disable-next-line no-await-in-loop
-    const ruleReports = await processRule(rule, versions, filePath)
+    const ruleReports = await processRule(rule, versions, filePath, {
+      concerns: ruleset.concerns,
+      context,
+    })
     reports.push(...ruleReports)
   }
 
   return reports
 }
 
-async function processRule(rule: Check, versions: FileVersions, filePath: string): Promise<ReportOutput[]> {
+interface ProcessRuleOptions {
+  concerns?: string[]
+  context?: ProcessingContext
+}
+
+async function processRule(
+  rule: Check,
+  versions: FileVersions,
+  filePath: string,
+  options: ProcessRuleOptions = {},
+): Promise<ReportOutput[]> {
   const reports: ReportOutput[] = []
 
   // Apply filters
@@ -60,15 +78,46 @@ async function processRule(rule: Check, versions: FileVersions, filePath: string
 
   // Execute actions if we have a filter result
   if (filterResult) {
-    for (const action of rule.actions) {
-      if (isReportAction(action)) {
-        const report = executeReportAction(action, filterResult, {filePath})
-        reports.push(report)
-      }
-    }
+    processActions(rule.actions, filterResult, filePath, reports, options)
   }
 
   return reports
+}
+
+function processActions(
+  actions: Check['actions'],
+  filterResult: FilterResult,
+  filePath: string,
+  reports: ReportOutput[],
+  options: ProcessRuleOptions,
+): void {
+  for (const action of actions) {
+    if (isReportAction(action)) {
+      const report = executeReportAction(action, filterResult, {filePath})
+      reports.push(report)
+    } else if (isUpdateConcernContextAction(action)) {
+      processUpdateConcernContextAction(action, filterResult, filePath, options)
+    }
+  }
+}
+
+function processUpdateConcernContextAction(
+  action: Parameters<typeof executeUpdateConcernContextAction>[0],
+  filterResult: FilterResult,
+  filePath: string,
+  options: ProcessRuleOptions,
+): void {
+  const {concerns, context} = options
+  if (context && concerns) {
+    const updates = executeUpdateConcernContextAction(action, filterResult, {filePath})
+    for (const concernId of concerns) {
+      if (!context.concerns[concernId]) {
+        context.concerns[concernId] = {}
+      }
+
+      Object.assign(context.concerns[concernId], updates)
+    }
+  }
 }
 
 /**

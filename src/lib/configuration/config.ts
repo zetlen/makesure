@@ -79,9 +79,20 @@ interface RunAction {
 }
 
 /**
+ * An action that updates the shared context of the concerns attached to the checkset.
+ */
+interface UpdateConcernContextAction {
+  /**
+   * Key-value pairs to set in the concern context.
+   * Values can be Handlebars templates which receive a FilterResult as evaluation context.
+   */
+  set: Record<string, string>
+}
+
+/**
  * Union type of all supported actions.
  */
-type Action = ReportAction | RunAction
+type Action = ReportAction | RunAction | UpdateConcernContextAction
 
 /**
  * A check defines filters to apply and actions to take when changes match.
@@ -109,10 +120,44 @@ export interface FileCheckset {
    */
   checks: Check[]
   /**
+   * List of concern IDs that this checkset is attached to.
+   */
+  concerns?: string[]
+  /**
    * Glob pattern for files to which this checkset applies.
    * Uses minimatch syntax for pattern matching.
    */
   include: string
+}
+
+/**
+ * A stakeholder interested in a set of concerns.
+ */
+export interface Stakeholder {
+  /**
+   * How to contact the stakeholder.
+   * Examples: "github-comment-mention", "github-reviewer-request", "github-assign", "webhook".
+   */
+  contactMethod: string
+  /**
+   * A description of the stakeholder's role or interest.
+   */
+  description?: string
+  /**
+   * The name of the stakeholder (e.g. a team or person).
+   */
+  name: string
+}
+
+/**
+ * A concern represents a specific area of interest or domain in the project.
+ * Checksets can be attached to concerns to group related checks.
+ */
+export interface Concern {
+  /**
+   * List of stakeholders associated with this concern.
+   */
+  stakeholders: Stakeholder[]
 }
 
 /**
@@ -124,4 +169,9 @@ export interface DistillConfig {
    * List of file checksets that define how to process different types of files.
    */
   checksets: FileCheckset[]
+  /**
+   * Dictionary of concerns defined in the project.
+   * Keys are concern IDs.
+   */
+  concerns?: Record<string, Concern>
 }

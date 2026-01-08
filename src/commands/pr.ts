@@ -129,6 +129,7 @@ Requires GITHUB_TOKEN environment variable for authentication.`
     }
 
     const reports = await processFiles(files, config, {
+      concerns: {},
       contentProvider,
       refs,
     })
