@@ -7,14 +7,16 @@ Process code changes with semantic rules
 [![Downloads/week](https://img.shields.io/npm/dw/distill.svg)](https://npmjs.org/package/distill)
 
 <!-- toc -->
-* [distill](#distill)
-* [Usage](#usage)
-* [Commands](#commands)
+
+- [distill](#distill)
+- [Usage](#usage)
+- [Commands](#commands)
 <!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
+
 ```sh-session
 $ npm install -g @distill/cli
 $ distill COMMAND
@@ -26,48 +28,57 @@ USAGE
   $ distill COMMAND
 ...
 ```
+
 <!-- usagestop -->
 
 # Commands
 
 <!-- commands -->
-* [`distill diff BASE HEAD`](#distill-diff-base-head)
-* [`distill help [COMMAND]`](#distill-help-command)
-* [`distill pr [PR]`](#distill-pr-pr)
 
-## `distill diff BASE HEAD`
+- [`distill diff [BASE] [HEAD]`](#distill-diff-base-head)
+- [`distill help [COMMAND]`](#distill-help-command)
+- [`distill pr [PR]`](#distill-pr-pr)
+
+## `distill diff [BASE] [HEAD]`
 
 Annotate a git diff with semantic analysis based on configured rules.
 
 ```
 USAGE
-  $ distill diff BASE HEAD [-c <value>] [--json] [-r <value>]
+  $ distill diff [BASE] [HEAD] [--json] [-c <value>] [-r <value>] [-s]
 
 ARGUMENTS
-  BASE  Base commit-ish (e.g., HEAD~1, main, a1b2c3d)
-  HEAD  Head commit-ish (e.g., HEAD, feat/foo, . for working directory)
+  [BASE]  Base commit-ish (e.g., HEAD~1, main). Defaults based on working tree state.
+  [HEAD]  Head commit-ish (e.g., HEAD, feat/foo, . for working directory). Defaults to "."
 
 FLAGS
   -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
   -r, --repo=<value>    Path to git repository
-      --json            Output reports in JSON format. Note: "lineRange" in metadata is relative to the filtered
-                        artifact, not necessarily the original source file. For some filters (like jq/xpath), exact
-                        source line mapping may be approximate.
+  -s, --staged          Only check staged changes (when comparing with working directory)
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Annotate a git diff with semantic analysis based on configured rules.
 
+  When no arguments are provided, defaults are chosen based on the working tree state:
+  - If there are unstaged changes, compares HEAD to the working directory
+  - If there are only staged changes, use --staged to check them
+
   When using --json, a "lineRange" field is included. Note that this range refers to the line numbers within the
   *filtered artifact* (the code snippet shown in the report), NOT the original source file.
 
-  Future versions may map these back to original source lines for supported filters (ast-grep, tsq, xpath).
-
 EXAMPLES
+  $ distill diff                  # auto-detect changes
+
+  $ distill diff --staged         # check staged changes only
+
   $ distill diff HEAD~1 HEAD
 
   $ distill diff main feat/foo
 
-  $ distill diff HEAD . # compare HEAD to working directory
+  $ distill diff HEAD .           # compare HEAD to working directory
 
   $ distill diff main HEAD --repo ../other-project
 ```
@@ -96,11 +107,11 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.3
 
 ## `distill pr [PR]`
 
-Annotate a GitHub Pull Request
+Annotate a GitHub Pull Request.
 
 ```
 USAGE
-  $ distill pr [PR] [-c <value>] [--json] [-r <value>]
+  $ distill pr [PR] [--json] [-c <value>] [-r <value>]
 
 ARGUMENTS
   [PR]  PR number or URL (optional: detects PR for current branch if omitted)
@@ -108,11 +119,26 @@ ARGUMENTS
 FLAGS
   -c, --config=<value>  Path to the distill configuration file (default: distill.yml in repo root)
   -r, --repo=<value>    GitHub repository (owner/repo). Required if not running in a git repo.
-      --json            Output reports in JSON format
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
-  Annotate a GitHub Pull Request
+  Annotate a GitHub Pull Request.
+
+  When no argument is provided, detects the PR associated with the current branch.
+  Requires GITHUB_TOKEN environment variable for authentication.
+
+EXAMPLES
+  $ distill pr                                # auto-detect PR for current branch
+
+  $ distill pr 123                            # PR number (uses detected remote)
+
+  $ distill pr https://github.com/owner/repo/pull/123
+
+  $ distill pr 123 --repo owner/repo
 ```
 
 _See code: [src/commands/pr.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/pr.ts)_
+
 <!-- commandsstop -->

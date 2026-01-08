@@ -67,4 +67,95 @@ index 0000000..1111111 100644
 
     scope.done()
   })
+
+  describe('URL parsing', () => {
+    it('accepts full GitHub PR URL', async () => {
+      const scope = nock('https://api.github.com')
+        .get('/repos/test-owner/test-repo')
+        // eslint-disable-next-line camelcase
+        .reply(200, {full_name: 'test-owner/test-repo'})
+        .get('/repos/test-owner/test-repo/pulls/456')
+        .reply(200, {
+          base: {sha: 'base-sha'},
+          head: {sha: 'head-sha'},
+        })
+        .get('/repos/test-owner/test-repo/pulls/456')
+        .matchHeader('accept', 'application/vnd.github.v3.diff')
+        .reply(200, '')
+
+      const configPath = resolve('test/fixtures/test-config.yml')
+      const {stdout} = await runCommand(`pr https://github.com/test-owner/test-repo/pull/456 --config ${configPath}`)
+
+      expect(stdout).to.contain('No changes found in PR #456')
+      scope.done()
+    })
+
+    it('rejects invalid GitHub URL format', async () => {
+      const {error} = await runCommand(`pr https://github.com/invalid-url --repo ${repo}`)
+      expect(error?.message).to.contain('Invalid GitHub PR URL format')
+    })
+
+    it('rejects non-numeric PR argument without URL', async () => {
+      const {error} = await runCommand(`pr not-a-number --repo ${repo}`)
+      expect(error?.message).to.contain('Invalid PR argument')
+      expect(error?.message).to.contain('Expected a PR number or URL')
+    })
+
+    it('validates --repo flag format', async () => {
+      const {error} = await runCommand(`pr 123 --repo invalid-format`)
+      expect(error?.message).to.contain('Invalid --repo format')
+      expect(error?.message).to.contain('Expected owner/repo')
+    })
+  })
+
+  describe('empty PR diff', () => {
+    it('returns empty array in JSON mode for empty PR', async () => {
+      const scope = nock('https://api.github.com')
+        .get('/repos/owner/repo/pulls/123')
+        .reply(200, {
+          base: {sha: 'base-sha'},
+          head: {sha: 'head-sha'},
+        })
+        .get('/repos/owner/repo/pulls/123')
+        .matchHeader('accept', 'application/vnd.github.v3.diff')
+        .reply(200, '')
+
+      const configPath = resolve('test/fixtures/test-config.yml')
+      const {stdout} = await runCommand(`pr ${prNumber} --repo ${repo} --config ${configPath} --json`)
+      const result = JSON.parse(stdout)
+      expect(result).to.be.an('array').that.is.empty
+
+      scope.done()
+    })
+
+    it('logs message for empty PR without JSON flag', async () => {
+      const scope = nock('https://api.github.com')
+        .get('/repos/owner/repo/pulls/123')
+        .reply(200, {
+          base: {sha: 'base-sha'},
+          head: {sha: 'head-sha'},
+        })
+        .get('/repos/owner/repo/pulls/123')
+        .matchHeader('accept', 'application/vnd.github.v3.diff')
+        .reply(200, '')
+
+      const configPath = resolve('test/fixtures/test-config.yml')
+      const {stdout} = await runCommand(`pr ${prNumber} --repo ${repo} --config ${configPath}`)
+      expect(stdout).to.contain('No changes found in PR #123')
+
+      scope.done()
+    })
+  })
+
+  describe('API error handling', () => {
+    it('handles inaccessible repository gracefully', async () => {
+      const scope = nock('https://api.github.com').get('/repos/private/repo').reply(404, {message: 'Not Found'})
+
+      const {error} = await runCommand(`pr https://github.com/private/repo/pull/1`)
+      expect(error?.message).to.contain('Cannot access repository')
+      expect(error?.message).to.contain('Check that GITHUB_TOKEN has access')
+
+      scope.done()
+    })
+  })
 })
