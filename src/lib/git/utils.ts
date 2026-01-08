@@ -71,10 +71,20 @@ export async function isValidRef(ref: string, cwd: string): Promise<boolean> {
 
 /**
  * Get git repository top-level directory
+ * @throws Error with user-friendly message if not inside a git repository
  */
 export async function getGitToplevel(cwd: string): Promise<string> {
-  const {stdout} = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {cwd})
-  return stdout.trim()
+  try {
+    const {stdout} = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {cwd})
+    return stdout.trim()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('not a git repository')) {
+      throw new Error(`Not a git repository: ${cwd}. Run this command from within a git repository.`)
+    }
+
+    throw new Error(`Failed to find git repository root: ${message}`)
+  }
 }
 
 /**
@@ -157,6 +167,7 @@ export async function getRemotes(cwd: string): Promise<RemoteInfo[]> {
  *
  * Note: --staged only works when comparing a commit with the working directory.
  * When comparing two commits, --staged is ignored.
+ * @throws Error with user-friendly message if refs are invalid
  */
 export async function getGitDiff(
   base: string,
@@ -177,6 +188,16 @@ export async function getGitDiff(
     args.push(base, head)
   }
 
-  const {stdout} = await execFileAsync('git', args, {cwd})
-  return stdout
+  try {
+    const {stdout} = await execFileAsync('git', args, {cwd})
+    return stdout
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // Check for common git errors about invalid refs
+    if (message.includes('unknown revision') || message.includes('bad revision')) {
+      throw new Error(`Invalid git reference: '${base}' or '${head}'. Please provide valid commit references.`)
+    }
+
+    throw new Error(`Failed to generate diff: ${message}`)
+  }
 }

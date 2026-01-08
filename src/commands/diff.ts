@@ -58,17 +58,20 @@ When using --json, a "lineRange" field is included. Note that this range refers 
   }
 
   public async run(): Promise<JsonOutput | void> {
-    // Resolve repository path
-    const repoPath = this.flags.repo ? resolve(process.cwd(), this.flags.repo) : await getGitToplevel(process.cwd())
+    // Resolve repository path - always validate via getGitToplevel for user-friendly errors
+    const startPath = this.flags.repo ? resolve(process.cwd(), this.flags.repo) : process.cwd()
+    const repoPath = await getGitToplevel(startPath)
     this.debug('found repo path', repoPath)
 
     // Resolve refs using smart defaults
-    const {base, diffOptions, head} = await this.resolveRefs(
-      this.args.base,
-      this.args.head,
-      repoPath,
-      this.flags.staged,
-    )
+    const resolved = await this.resolveRefs(this.args.base, this.args.head, repoPath, this.flags.staged)
+
+    // No changes detected - exit gracefully
+    if (!resolved) {
+      return this.jsonEnabled() ? [] : undefined
+    }
+
+    const {base, diffOptions, head} = resolved
     this.debug('resolved refs', {base, diffOptions, head})
 
     // Resolve config path (default to distill.yml in repo root)
@@ -125,12 +128,20 @@ When using --json, a "lineRange" field is included. Note that this range refers 
     return this.outputReports(reports)
   }
 
+  /**
+   * Resolve base and head refs using smart defaults based on working tree state.
+   * Returns null if no changes are detected (caller should exit gracefully).
+   *
+   * Note: This method reads working tree status once at the start, then may call
+   * isValidRef multiple times. In rare cases where files change during execution,
+   * the logic could produce inconsistent results. This is acceptable for CLI usage.
+   */
   private async resolveRefs(
     baseArg: string | undefined,
     headArg: string | undefined,
     repoPath: string,
     stagedFlag: boolean,
-  ): Promise<ResolvedRefs> {
+  ): Promise<null | ResolvedRefs> {
     // Case: Both arguments provided - use as-is
     if (baseArg && headArg) {
       return {base: baseArg, diffOptions: {staged: stagedFlag}, head: headArg}
@@ -159,7 +170,7 @@ When using --json, a "lineRange" field is included. Note that this range refers 
       this.warn(
         'There are no changes in the working tree. Provide at least one reference to compare with the current commit.',
       )
-      this.exit(0)
+      return null
     }
 
     // 1c: Staged changes exist
@@ -176,9 +187,9 @@ When using --json, a "lineRange" field is included. Note that this range refers 
 
       // --staged not supplied but staged changes exist
       if (!status.hasUnstaged) {
-        // Only staged, no unstaged: warn and exit
+        // Only staged, no unstaged: warn and return null (caller exits gracefully)
         this.warn('There are staged changes but no unstaged changes. Use --staged to check staged changes.')
-        this.exit(0)
+        return null
       }
 
       // Both staged and unstaged exist, --staged not supplied

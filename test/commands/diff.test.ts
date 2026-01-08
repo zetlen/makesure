@@ -1,9 +1,14 @@
 import {runCommand} from '@oclif/test'
 import {expect} from 'chai'
-import {dirname, resolve} from 'node:path'
+import {execFile} from 'node:child_process'
+import {mkdtemp, rm, writeFile} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import {dirname, join, resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
+import {promisify} from 'node:util'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const execFileAsync = promisify(execFile)
 
 describe('diff', () => {
   it('uses smart defaults when no arguments provided (will warn or run based on repo state)', async () => {
@@ -49,5 +54,118 @@ describe('diff', () => {
     // So this should behave the same as 'diff HEAD HEAD'
     const {stdout} = await runCommand('diff HEAD HEAD --staged')
     expect(stdout).to.contain('No changes between HEAD and HEAD')
+  })
+
+  it('returns empty array in JSON mode when no changes', async () => {
+    const {stdout} = await runCommand('diff HEAD HEAD --json')
+    const result = JSON.parse(stdout)
+    expect(result).to.be.an('array').that.is.empty
+  })
+
+  describe('with temp git repo', () => {
+    let tempDir: string
+
+    beforeEach(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'distill-diff-test-'))
+      await execFileAsync('git', ['init'], {cwd: tempDir})
+      await execFileAsync('git', ['config', 'user.email', 'test@test.com'], {cwd: tempDir})
+      await execFileAsync('git', ['config', 'user.name', 'Test'], {cwd: tempDir})
+      // Create a minimal distill.yml
+      await writeFile(join(tempDir, 'distill.yml'), 'checksets: []')
+      await writeFile(join(tempDir, 'test.txt'), 'hello')
+      await execFileAsync('git', ['add', '.'], {cwd: tempDir})
+      await execFileAsync('git', ['commit', '-m', 'initial'], {cwd: tempDir})
+    })
+
+    afterEach(async () => {
+      await rm(tempDir, {force: true, recursive: true})
+    })
+
+    it('detects unstaged changes with smart defaults', async () => {
+      await writeFile(join(tempDir, 'test.txt'), 'hello world')
+
+      const {stdout} = await runCommand(`diff --repo ${tempDir}`)
+      // Should not error about missing arguments
+      expect(stdout).to.not.contain('Missing')
+      // Should either show changes or "No changes" (empty diff is fine with our empty config)
+    })
+
+    it('warns when only staged changes exist without --staged flag', async () => {
+      await writeFile(join(tempDir, 'test.txt'), 'hello world')
+      await execFileAsync('git', ['add', '.'], {cwd: tempDir})
+
+      const {stderr} = await runCommand(`diff --repo ${tempDir}`)
+      expect(stderr).to.include('staged')
+      expect(stderr).to.include('--staged')
+    })
+
+    it('processes staged changes with --staged flag', async () => {
+      await writeFile(join(tempDir, 'test.txt'), 'hello world')
+      await execFileAsync('git', ['add', '.'], {cwd: tempDir})
+
+      const {stderr} = await runCommand(`diff --staged --repo ${tempDir}`)
+      // Should not error
+      expect(stderr).to.not.include('Error')
+    })
+
+    it('warns about skipped staged changes when both staged and unstaged exist', async () => {
+      await writeFile(join(tempDir, 'test.txt'), 'hello world')
+      await execFileAsync('git', ['add', '.'], {cwd: tempDir})
+      await writeFile(join(tempDir, 'test.txt'), 'hello world!')
+
+      const {stderr} = await runCommand(`diff --repo ${tempDir}`)
+      expect(stderr).to.include('Skipping staged')
+    })
+
+    it('warns about clean working tree', async () => {
+      const {stderr} = await runCommand(`diff --repo ${tempDir}`)
+      expect(stderr).to.include('no changes')
+    })
+
+    it('returns empty array in JSON mode for clean working tree', async () => {
+      const {stdout} = await runCommand(`diff --json --repo ${tempDir}`)
+      const result = JSON.parse(stdout)
+      expect(result).to.be.an('array').that.is.empty
+    })
+
+    it('treats single ref argument as head, compares with HEAD', async () => {
+      // Create a second commit
+      await writeFile(join(tempDir, 'test.txt'), 'hello world')
+      await execFileAsync('git', ['add', '.'], {cwd: tempDir})
+      await execFileAsync('git', ['commit', '-m', 'update'], {cwd: tempDir})
+
+      // Compare current HEAD with HEAD~1 (single arg is treated as head, base defaults to HEAD)
+      const {stdout} = await runCommand(`diff HEAD~1 --repo ${tempDir}`)
+      // Note: with single ref, it compares HEAD to that ref
+      expect(stdout).to.not.contain('Error')
+    })
+
+    it('handles comparison between two explicit refs', async () => {
+      // Create a second commit
+      await writeFile(join(tempDir, 'test.txt'), 'hello world')
+      await execFileAsync('git', ['add', '.'], {cwd: tempDir})
+      await execFileAsync('git', ['commit', '-m', 'update'], {cwd: tempDir})
+
+      const {stdout} = await runCommand(`diff HEAD~1 HEAD --repo ${tempDir}`)
+      // Should process without errors (empty config means no reports)
+      expect(stdout).to.not.contain('Error')
+    })
+
+    it('provides user-friendly error for invalid refs', async () => {
+      const {error} = await runCommand(`diff nonexistent-ref HEAD --repo ${tempDir}`)
+      expect(error).to.exist
+      expect(error!.message).to.include('Invalid git reference')
+    })
+
+    it('provides user-friendly error when not in a git repo', async () => {
+      const nonGitDir = await mkdtemp(join(tmpdir(), 'not-git-'))
+      try {
+        const {error} = await runCommand(`diff HEAD HEAD --repo ${nonGitDir}`)
+        expect(error).to.exist
+        expect(error!.message).to.include('Not a git repository')
+      } finally {
+        await rm(nonGitDir, {force: true, recursive: true})
+      }
+    })
   })
 })
