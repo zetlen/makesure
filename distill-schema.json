@@ -2,6 +2,20 @@
   "$ref": "#/definitions/DistillConfig",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "Action": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ReportAction"
+        },
+        {
+          "$ref": "#/definitions/RunAction"
+        },
+        {
+          "$ref": "#/definitions/UpdateConcernContextAction"
+        }
+      ],
+      "description": "Union type of all supported actions. Actions can be discriminated by:\n- 'template' property -> ReportAction\n- 'command' property -> RunAction\n- 'set' property -> UpdateConcernContextAction"
+    },
     "AstGrepFilterConfig": {
       "additionalProperties": false,
       "description": "Configuration for the ast-grep filter. Extracts AST nodes from source code using ast-grep's pattern syntax. Patterns look like actual code with metavariables ($VAR) for wildcards.",
@@ -53,76 +67,7 @@
         "actions": {
           "description": "Actions to run when the check is triggered. Will run once per file that matches the check's filters.",
           "items": {
-            "anyOf": [
-              {
-                "additionalProperties": false,
-                "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to stdout or an API call (for example, a GitHub comment).",
-                "properties": {
-                  "template": {
-                    "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a FilterResult as its evaluation context.",
-                    "type": "string"
-                  },
-                  "urgency": {
-                    "description": "Urgency of report. Higher values indicate more important/urgent reports. Reports are sorted by urgency (highest first) when output.",
-                    "type": "number"
-                  }
-                },
-                "required": ["template", "urgency"],
-                "type": "object"
-              },
-              {
-                "additionalProperties": false,
-                "description": "A \"run\" action runs an arbitrary command that receives details about the change as environment variables.",
-                "properties": {
-                  "args": {
-                    "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a FilterResult as evaluation context.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  },
-                  "command": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
-                      }
-                    ],
-                    "description": "Path to the command. Can be a string or an array of strings which will be evaluated as arguments to produce the command path."
-                  },
-                  "env": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a FilterResult as evaluation context.",
-                    "type": "object"
-                  }
-                },
-                "required": ["args", "command", "env"],
-                "type": "object"
-              },
-              {
-                "additionalProperties": false,
-                "description": "An action that updates the shared context of the concerns attached to the checkset.",
-                "properties": {
-                  "set": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "description": "Key-value pairs to set in the concern context. Values can be Handlebars templates which receive a FilterResult as evaluation context.",
-                    "type": "object"
-                  }
-                },
-                "required": ["set"],
-                "type": "object"
-              }
-            ],
-            "description": "Union type of all supported actions."
+            "$ref": "#/definitions/Action"
           },
           "type": "array"
         },
@@ -265,6 +210,68 @@
       "required": ["pattern", "type"],
       "type": "object"
     },
+    "ReportAction": {
+      "additionalProperties": false,
+      "description": "A \"report\" action produces a text report about the change. It can be routed many places, including to stdout or an API call (for example, a GitHub comment).",
+      "properties": {
+        "template": {
+          "description": "Handlebars template for the comment to produce. Accepts markdown, and receives a FilterResult as its evaluation context.",
+          "type": "string"
+        },
+        "type": {
+          "const": "report",
+          "description": "Discriminant for tagged union. Implied when 'template' is present.",
+          "type": "string"
+        },
+        "urgency": {
+          "description": "Urgency of report. Higher values indicate more important/urgent reports. Reports are sorted by urgency (highest first) when output.",
+          "type": "number"
+        }
+      },
+      "required": ["template", "urgency"],
+      "type": "object"
+    },
+    "RunAction": {
+      "additionalProperties": false,
+      "description": "A \"run\" action runs an arbitrary command that receives details about the change as environment variables.",
+      "properties": {
+        "args": {
+          "description": "If the command requires arguments, they can be evaluated here as Handlebars templates which receive a FilterResult as evaluation context.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "Path to the command. Can be a string or an array of strings which will be evaluated as arguments to produce the command path."
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "If the default environment variables don't suffice, you can define new ones as Handlebars templates which receive a FilterResult as evaluation context.",
+          "type": "object"
+        },
+        "type": {
+          "const": "run",
+          "description": "Discriminant for tagged union. Implied when 'command' is present.",
+          "type": "string"
+        }
+      },
+      "required": ["args", "command", "env"],
+      "type": "object"
+    },
     "Stakeholder": {
       "additionalProperties": false,
       "description": "A stakeholder interested in a set of concerns.",
@@ -317,6 +324,26 @@
     },
     "TsqSupportedExtension": {
       "$ref": "#/definitions/SupportedExtension"
+    },
+    "UpdateConcernContextAction": {
+      "additionalProperties": false,
+      "description": "An action that updates the shared context of the concerns attached to the checkset.",
+      "properties": {
+        "set": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Key-value pairs to set in the concern context. Values can be Handlebars templates which receive a FilterResult as evaluation context.",
+          "type": "object"
+        },
+        "type": {
+          "const": "set",
+          "description": "Discriminant for tagged union. Implied when 'set' is present.",
+          "type": "string"
+        }
+      },
+      "required": ["set"],
+      "type": "object"
     },
     "XPathFilterConfig": {
       "additionalProperties": false,

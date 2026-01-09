@@ -98,7 +98,7 @@ Requires GITHUB_TOKEN environment variable for authentication.`
 
     if (!diffString.trim()) {
       if (this.jsonEnabled()) {
-        return []
+        return {concerns: {}, reports: []}
       }
 
       this.log('No changes found in PR #%d', number)
@@ -128,13 +128,13 @@ Requires GITHUB_TOKEN environment variable for authentication.`
       }
     }
 
-    const reports = await processFiles(files, config, {
+    const result = await processFiles(files, config, {
       concerns: {},
       contentProvider,
       refs,
     })
 
-    return this.outputReports(reports)
+    return this.outputReports(result)
   }
 
   private async detectPrFromContext(octokit: Octokit): Promise<PrInfo> {

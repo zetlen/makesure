@@ -57,10 +57,11 @@ describe('diff command', () => {
       expect(stdout).to.contain('No changes between HEAD and HEAD')
     })
 
-    it('returns empty array in JSON mode when no changes', async () => {
+    it('returns empty JSON object when no changes', async () => {
       const {stdout} = await runCommand('diff HEAD HEAD --json')
       const result = JSON.parse(stdout)
-      expect(result).to.be.an('array').that.is.empty
+      expect(result).to.have.property('concerns').that.deep.equals({})
+      expect(result).to.have.property('reports').that.is.an('array').that.is.empty
     })
   })
 
@@ -125,10 +126,11 @@ describe('diff command', () => {
       expect(stderr).to.include('no changes')
     })
 
-    it('returns empty array in JSON mode for clean working tree', async () => {
+    it('returns empty JSON object for clean working tree', async () => {
       const {stdout} = await runCommand(`diff --json --repo ${tempDir}`)
       const result = JSON.parse(stdout)
-      expect(result).to.be.an('array').that.is.empty
+      expect(result).to.have.property('concerns').that.deep.equals({})
+      expect(result).to.have.property('reports').that.is.an('array').that.is.empty
     })
 
     it('treats single ref argument as head, compares with HEAD', async () => {
@@ -178,10 +180,11 @@ describe('diff command', () => {
     })
   })
 
-  it('returns empty array in JSON mode when no changes', async () => {
+  it('returns empty JSON object when no changes', async () => {
     const {stdout} = await runCommand('diff HEAD HEAD --json')
     const result = JSON.parse(stdout)
-    expect(result).to.be.an('array').that.is.empty
+    expect(result).to.have.property('concerns').that.deep.equals({})
+    expect(result).to.have.property('reports').that.is.an('array').that.is.empty
   })
 
   describe('with temp git repo', () => {
@@ -244,10 +247,11 @@ describe('diff command', () => {
       expect(stderr).to.include('no changes')
     })
 
-    it('returns empty array in JSON mode for clean working tree', async () => {
+    it('returns empty JSON object for clean working tree', async () => {
       const {stdout} = await runCommand(`diff --json --repo ${tempDir}`)
       const result = JSON.parse(stdout)
-      expect(result).to.be.an('array').that.is.empty
+      expect(result).to.have.property('concerns').that.deep.equals({})
+      expect(result).to.have.property('reports').that.is.an('array').that.is.empty
     })
 
     it('treats single ref argument as head, compares with HEAD', async () => {

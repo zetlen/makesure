@@ -1,9 +1,46 @@
 # yaml-language-server: $schema=./distill-schema.json
+
+# =============================================================================
+# CONCERNS & STAKEHOLDERS
+# =============================================================================
+concerns:
+  cli-interface:
+    stakeholders:
+      - name: Product Team
+        description: Ensures CLI changes align with product direction and user experience
+        contactMethod: ruthless-pm@distill.dev
+      - name: Principal Engineer
+        description: Reviews CLI changes for adoption impact on large teams
+        contactMethod: principal-engineer@distill.dev
+
+  performance:
+    stakeholders:
+      - name: Performance Monarch
+        description: Evaluates performance implications of changes to filters and processing
+        contactMethod: performance-monarch@distill.dev
+
+  architecture:
+    stakeholders:
+      - name: Principal Engineer
+        description: Reviews architectural changes for maintainability and scalability
+        contactMethod: principal-engineer@distill.dev
+      - name: Product Team
+        description: Ensures architectural changes support product roadmap
+        contactMethod: ruthless-pm@distill.dev
+
+  security:
+    stakeholders:
+      - name: Security Team
+        description: Reviews changes for security implications
+        contactMethod: security-team@distill.dev
+
 checksets:
   # =============================================================================
   # PACKAGE.JSON CHECKS
   # =============================================================================
   - include: 'package.json'
+    concerns:
+      - security
     checks:
       # Runtime dependencies (excluding frequently-updated ones)
       - actions:
@@ -84,6 +121,8 @@ checksets:
   # CLI COMMAND INTERFACE CHECKS
   # =============================================================================
   - include: 'src/commands/**/*.ts'
+    concerns:
+      - cli-interface
     checks:
       # Semantic Check: New Command Created
       - actions:
@@ -166,6 +205,8 @@ checksets:
   # CONFIGURATION SCHEMA CHECKS
   # =============================================================================
   - include: 'src/lib/configuration/config.ts'
+    concerns:
+      - architecture
     checks:
       # FilterConfig union type - tracks when filter types are added/removed
       - actions:
@@ -235,6 +276,9 @@ checksets:
   # FILTER IMPLEMENTATION CHECKS
   # =============================================================================
   - include: 'src/lib/filters/index.ts'
+    concerns:
+      - performance
+      - architecture
     checks:
       # Filter router switch statement
       - actions:
@@ -253,6 +297,8 @@ checksets:
             pattern: 'switch ($CONFIG.type) { $$$CASES }'
 
   - include: 'src/lib/filters/*.ts'
+    concerns:
+      - performance
     checks:
       # Filter config type definitions
       - actions:
@@ -292,6 +338,8 @@ checksets:
   # DOCKER CONFIGURATION
   # =============================================================================
   - include: 'Dockerfile'
+    concerns:
+      - security
     checks:
       # Base image changes
       - actions:

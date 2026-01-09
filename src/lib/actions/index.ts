@@ -1,11 +1,10 @@
 import Handlebars from 'handlebars'
 
+import type {Action, ReportAction, RunAction, UpdateConcernContextAction} from '../configuration/config.js'
 import type {FilterResult} from '../filters/index.js'
 
-export interface ReportAction {
-  template: string
-  urgency: number
-}
+// Re-export action types for convenience
+export type {Action, ReportAction, RunAction, UpdateConcernContextAction} from '../configuration/config.js'
 
 export interface ReportMetadata {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,10 +55,6 @@ export function executeReportAction(
   }
 }
 
-export interface UpdateConcernContextAction {
-  set: Record<string, string>
-}
-
 /**
  * Execute an update concern context action.
  * Returns the updates to be applied to the concern context.
@@ -84,25 +79,22 @@ export function executeUpdateConcernContextAction(
 }
 
 /**
- * Check if an action is a report action.
+ * Type guard for report actions. Checks for the 'template' property which is unique to ReportAction.
  */
-export function isReportAction(action: unknown): action is ReportAction {
-  return (
-    typeof action === 'object' &&
-    action !== null &&
-    'template' in action &&
-    typeof (action as ReportAction).template === 'string'
-  )
+export function isReportAction(action: Action): action is ReportAction {
+  return 'template' in action
 }
 
 /**
- * Check if an action is an update concern context action.
+ * Type guard for run actions. Checks for the 'command' property which is unique to RunAction.
  */
-export function isUpdateConcernContextAction(action: unknown): action is UpdateConcernContextAction {
-  return (
-    typeof action === 'object' &&
-    action !== null &&
-    'set' in action &&
-    typeof (action as UpdateConcernContextAction).set === 'object'
-  )
+export function isRunAction(action: Action): action is RunAction {
+  return 'command' in action
+}
+
+/**
+ * Type guard for update concern context actions. Checks for the 'set' property.
+ */
+export function isUpdateConcernContextAction(action: Action): action is UpdateConcernContextAction {
+  return 'set' in action
 }

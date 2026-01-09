@@ -43,12 +43,16 @@ export type {XPathFilterConfig} from '../filters/xpath.js'
  * It can be routed many places, including to stdout or an API call
  * (for example, a GitHub comment).
  */
-interface ReportAction {
+export interface ReportAction {
   /**
    * Handlebars template for the comment to produce. Accepts markdown,
    * and receives a FilterResult as its evaluation context.
    */
   template: string
+  /**
+   * Discriminant for tagged union. Implied when 'template' is present.
+   */
+  type?: 'report'
   /**
    * Urgency of report. Higher values indicate more important/urgent reports.
    * Reports are sorted by urgency (highest first) when output.
@@ -60,7 +64,7 @@ interface ReportAction {
  * A "run" action runs an arbitrary command that receives details about the
  * change as environment variables.
  */
-interface RunAction {
+export interface RunAction {
   /**
    * If the command requires arguments, they can be evaluated here as Handlebars
    * templates which receive a FilterResult as evaluation context.
@@ -76,23 +80,35 @@ interface RunAction {
    * as Handlebars templates which receive a FilterResult as evaluation context.
    */
   env: Record<string, string>
+  /**
+   * Discriminant for tagged union. Implied when 'command' is present.
+   */
+  type?: 'run'
 }
 
 /**
  * An action that updates the shared context of the concerns attached to the checkset.
  */
-interface UpdateConcernContextAction {
+export interface UpdateConcernContextAction {
   /**
    * Key-value pairs to set in the concern context.
    * Values can be Handlebars templates which receive a FilterResult as evaluation context.
    */
   set: Record<string, string>
+  /**
+   * Discriminant for tagged union. Implied when 'set' is present.
+   */
+  type?: 'set'
 }
 
 /**
  * Union type of all supported actions.
+ * Actions can be discriminated by:
+ * - 'template' property -> ReportAction
+ * - 'command' property -> RunAction
+ * - 'set' property -> UpdateConcernContextAction
  */
-type Action = ReportAction | RunAction | UpdateConcernContextAction
+export type Action = ReportAction | RunAction | UpdateConcernContextAction
 
 /**
  * A check defines filters to apply and actions to take when changes match.

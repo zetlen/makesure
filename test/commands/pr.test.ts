@@ -109,7 +109,7 @@ index 0000000..1111111 100644
   })
 
   describe('empty PR diff', () => {
-    it('returns empty array in JSON mode for empty PR', async () => {
+    it('returns empty JSON object for empty PR', async () => {
       const scope = nock('https://api.github.com')
         .get('/repos/owner/repo/pulls/123')
         .reply(200, {
@@ -123,7 +123,8 @@ index 0000000..1111111 100644
       const configPath = resolve('test/fixtures/test-config.yml')
       const {stdout} = await runCommand(`pr ${prNumber} --repo ${repo} --config ${configPath} --json`)
       const result = JSON.parse(stdout)
-      expect(result).to.be.an('array').that.is.empty
+      expect(result).to.have.property('concerns').that.deep.equals({})
+      expect(result).to.have.property('reports').that.is.an('array').that.is.empty
 
       scope.done()
     })

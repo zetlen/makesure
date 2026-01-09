@@ -1,9 +1,9 @@
 import {minimatch} from 'minimatch'
 
 import type {ReportOutput} from '../actions/index.js'
-import type {Check, DistillConfig, FileCheckset} from '../configuration/config.js'
+import type {Action, Check, DistillConfig, FileCheckset, UpdateConcernContextAction} from '../configuration/config.js'
 import type {File, FileVersions} from '../diff/parser.js'
-import type {ProcessingContext} from './types.js'
+import type {ConcernContext, ProcessingContext} from './types.js'
 
 import {
   executeReportAction,
@@ -13,62 +13,79 @@ import {
 } from '../actions/index.js'
 import {applyFilter, type FilterResult} from '../filters/index.js'
 
+/** Result of processing files through all checksets */
+export interface ProcessingResult {
+  concerns: ConcernContext
+  reports: ReportOutput[]
+}
+
 export async function processFiles(
   files: File[],
   config: DistillConfig,
   context: ProcessingContext,
-): Promise<ReportOutput[]> {
+): Promise<ProcessingResult> {
   const reports: ReportOutput[] = []
 
   for (const file of files) {
     for (const checkset of config.checksets) {
       // eslint-disable-next-line no-await-in-loop
-      const rulesetReports = await processRuleset(checkset as FileCheckset, file, context)
+      const rulesetReports = await processCheckset({checkset, context, file})
       reports.push(...rulesetReports)
     }
   }
 
-  return reports
+  return {concerns: context.concerns, reports}
 }
 
-async function processRuleset(ruleset: FileCheckset, file: File, context: ProcessingContext): Promise<ReportOutput[]> {
+/** Options for processing a checkset against a file */
+interface ProcessChecksetOptions {
+  checkset: FileCheckset
+  context: ProcessingContext
+  file: File
+}
+
+async function processCheckset(options: ProcessChecksetOptions): Promise<ReportOutput[]> {
+  const {checkset, context, file} = options
   const filePath = file.newPath || file.oldPath
 
-  if (!minimatch(filePath, ruleset.include)) {
+  if (!minimatch(filePath, checkset.include)) {
     return []
   }
 
   const versions = await getFileVersions(file, context)
   const reports: ReportOutput[] = []
 
-  for (const rule of ruleset.checks) {
+  for (const check of checkset.checks) {
     // eslint-disable-next-line no-await-in-loop
-    const ruleReports = await processRule(rule, versions, filePath, {
-      concerns: ruleset.concerns,
+    const checkReports = await processCheck({
+      check,
+      concernIds: checkset.concerns,
       context,
+      filePath,
+      versions,
     })
-    reports.push(...ruleReports)
+    reports.push(...checkReports)
   }
 
   return reports
 }
 
-interface ProcessRuleOptions {
-  concerns?: string[]
-  context?: ProcessingContext
+/** Options for processing a single check */
+interface ProcessCheckOptions {
+  check: Check
+  concernIds?: string[]
+  context: ProcessingContext
+  filePath: string
+  versions: FileVersions
 }
 
-async function processRule(
-  rule: Check,
-  versions: FileVersions,
-  filePath: string,
-  options: ProcessRuleOptions = {},
-): Promise<ReportOutput[]> {
+async function processCheck(options: ProcessCheckOptions): Promise<ReportOutput[]> {
+  const {check, concernIds, context, filePath, versions} = options
   const reports: ReportOutput[] = []
 
-  // Apply filters
+  // Apply filters - all must pass
   let filterResult: FilterResult | null = null
-  for (const filter of rule.filters) {
+  for (const filter of check.filters) {
     // eslint-disable-next-line no-await-in-loop
     filterResult = await applyFilter(filter, versions, filePath)
     if (!filterResult) {
@@ -78,45 +95,66 @@ async function processRule(
 
   // Execute actions if we have a filter result
   if (filterResult) {
-    processActions(rule.actions, filterResult, filePath, reports, options)
+    processActions({
+      actions: check.actions,
+      concernIds,
+      context,
+      filePath,
+      filterResult,
+      reports,
+    })
   }
 
   return reports
 }
 
-function processActions(
-  actions: Check['actions'],
-  filterResult: FilterResult,
-  filePath: string,
-  reports: ReportOutput[],
-  options: ProcessRuleOptions,
-): void {
+/** Options for processing actions from a triggered check */
+interface ProcessActionsOptions {
+  actions: Action[]
+  concernIds?: string[]
+  context: ProcessingContext
+  filePath: string
+  filterResult: FilterResult
+  reports: ReportOutput[]
+}
+
+function processActions(options: ProcessActionsOptions): void {
+  const {actions, concernIds, context, filePath, filterResult, reports} = options
+
   for (const action of actions) {
     if (isReportAction(action)) {
       const report = executeReportAction(action, filterResult, {filePath})
       reports.push(report)
     } else if (isUpdateConcernContextAction(action)) {
-      processUpdateConcernContextAction(action, filterResult, filePath, options)
+      applyConcernContextUpdates({action, concernIds, context, filePath, filterResult})
     }
   }
 }
 
-function processUpdateConcernContextAction(
-  action: Parameters<typeof executeUpdateConcernContextAction>[0],
-  filterResult: FilterResult,
-  filePath: string,
-  options: ProcessRuleOptions,
-): void {
-  const {concerns, context} = options
-  if (context && concerns) {
-    const updates = executeUpdateConcernContextAction(action, filterResult, {filePath})
-    for (const concernId of concerns) {
-      if (!context.concerns[concernId]) {
-        context.concerns[concernId] = {}
-      }
+/** Options for applying concern context updates */
+interface ApplyConcernContextUpdatesOptions {
+  action: UpdateConcernContextAction
+  concernIds?: string[]
+  context: ProcessingContext
+  filePath: string
+  filterResult: FilterResult
+}
 
-      Object.assign(context.concerns[concernId], updates)
+function applyConcernContextUpdates(options: ApplyConcernContextUpdatesOptions): void {
+  const {action, concernIds, context, filePath, filterResult} = options
+
+  if (!concernIds) {
+    return
+  }
+
+  const updates = executeUpdateConcernContextAction(action, filterResult, {filePath})
+
+  for (const concernId of concernIds) {
+    if (!context.concerns[concernId]) {
+      context.concerns[concernId] = {}
     }
+
+    context.concerns[concernId] = {...context.concerns[concernId], ...updates}
   }
 }
 

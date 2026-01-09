@@ -1,6 +1,7 @@
 import {Command, Flags, Interfaces} from '@oclif/core'
 
 import type {ReportMetadata, ReportOutput} from '../lib/actions/index.js'
+import type {ConcernContext} from '../lib/processing/types.js'
 
 // Type helpers for inherited flags and args
 export type InferredFlags<T extends typeof Command> = Interfaces.InferredFlags<
@@ -8,8 +9,11 @@ export type InferredFlags<T extends typeof Command> = Interfaces.InferredFlags<
 >
 export type InferredArgs<T extends typeof Command> = Interfaces.InferredArgs<T['args']>
 
-// JSON output type for all commands
-export type JsonOutput = ReportMetadata[]
+/** JSON output structure for all commands */
+export interface JsonOutput {
+  concerns: ConcernContext
+  reports: ReportMetadata[]
+}
 
 /**
  * Base command for distill CLI.
@@ -59,10 +63,12 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
 
   /**
    * Output reports, sorted by urgency.
-   * When JSON is enabled, returns data for oclif to stringify.
+   * When JSON is enabled, returns data for oclif to stringify including concerns.
    * Otherwise, logs text output to stdout.
    */
-  protected outputReports(reports: ReportOutput[]): JsonOutput | void {
+  protected outputReports(options: {concerns?: ConcernContext; reports: ReportOutput[]}): JsonOutput | void {
+    const {concerns = {}, reports} = options
+
     // Sort by urgency (highest first)
     reports.sort((a, b) => b.urgency - a.urgency)
 
@@ -77,7 +83,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
 
     if (this.jsonEnabled()) {
       // Return for oclif to handle JSON output
-      return jsonReports
+      return {concerns, reports: jsonReports}
     }
 
     // Normal text output
