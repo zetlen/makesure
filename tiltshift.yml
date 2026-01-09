@@ -78,6 +78,31 @@ subjects:
         contactMethod: principal-engineer@tiltshift.dev
 
     projections:
+      # New command detection
+      - include: 'src/commands/**/*.ts'
+        focuses:
+          - type: tsq
+            query: |
+              (class_declaration
+                name: (type_identifier) @name
+                (class_heritage
+                  (extends_clause
+                    value: (identifier) @base_class
+                    (#eq? @base_class "BaseCommand")
+                  )
+                )
+              ) @class_decl
+            capture: class_decl
+        viewers:
+          - template: |
+              # New CLI command detected
+
+              A new command class has been created.
+
+              ```typescript
+              {{diffText}}
+              ```
+
       # Command arguments
       - include: 'src/commands/**/*.ts'
         focuses:
