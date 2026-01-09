@@ -7,28 +7,26 @@ Process code changes with semantic rules
 [![Downloads/week](https://img.shields.io/npm/dw/distill.svg)](https://npmjs.org/package/distill)
 
 <!-- toc -->
-
-- [distill](#distill)
-- [Usage](#usage)
-- [Commands](#commands)
+* [distill](#distill)
+* [Usage](#usage)
+* [Configuration](#configuration)
+* [Commands](#commands)
 <!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
-
 ```sh-session
 $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/1.1.0 darwin-arm64 node-v24.12.0
+@distill/cli/2.0.0 linux-x64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
 ...
 ```
-
 <!-- usagestop -->
 
 # Configuration
@@ -82,10 +80,9 @@ checksets:
 # Commands
 
 <!-- commands -->
-
-- [`distill diff [BASE] [HEAD]`](#distill-diff-base-head)
-- [`distill help [COMMAND]`](#distill-help-command)
-- [`distill pr [PR]`](#distill-pr-pr)
+* [`distill diff [BASE] [HEAD]`](#distill-diff-base-head)
+* [`distill help [COMMAND]`](#distill-help-command)
+* [`distill pr [PR]`](#distill-pr-pr)
 
 ## `distill diff [BASE] [HEAD]`
 
@@ -131,7 +128,7 @@ EXAMPLES
   $ distill diff main HEAD --repo ../other-project
 ```
 
-_See code: [src/commands/diff.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/diff.ts)_
+_See code: [src/commands/diff.ts](https://github.com/zetlen/distill/blob/v2.0.0/src/commands/diff.ts)_
 
 ## `distill help [COMMAND]`
 
@@ -187,6 +184,5 @@ EXAMPLES
   $ distill pr 123 --repo owner/repo
 ```
 
-_See code: [src/commands/pr.ts](https://github.com/zetlen/distill/blob/v1.1.0/src/commands/pr.ts)_
-
+_See code: [src/commands/pr.ts](https://github.com/zetlen/distill/blob/v2.0.0/src/commands/pr.ts)_
 <!-- commandsstop -->
