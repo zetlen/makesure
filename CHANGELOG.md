@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.0](https://github.com/zetlen/distill/compare/cli-v1.1.0...cli-v2.0.0) (2026-01-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove unnecessary topic layer ([#18](https://github.com/zetlen/distill/issues/18))
+
+### Features
+
+* add CLI ergonomics with smart defaults and base command ([#20](https://github.com/zetlen/distill/issues/20)) ([28a44b4](https://github.com/zetlen/distill/commit/28a44b42abbe7084cd0b7b26b80f31430eda68f7))
+* add concerns and stakeholders to configuration ([#21](https://github.com/zetlen/distill/issues/21)) ([f4e7fae](https://github.com/zetlen/distill/commit/f4e7fae0b8ac6e5eb3f0afffb074dbff656e327e))
+
+
+### Code Refactoring
+
+* remove unnecessary topic layer ([#18](https://github.com/zetlen/distill/issues/18)) ([21de299](https://github.com/zetlen/distill/commit/21de2994e286768c5e2f3f34698e2d9c7e4354ee))
+
 ## [1.1.0](https://github.com/zetlen/distill/compare/cli-v1.0.2...cli-v1.1.0) (2026-01-06)
 
 
