@@ -1,6 +1,6 @@
 import {expect} from 'chai'
 
-import {tsqFilter} from '../../../src/lib/filters'
+import {tsqFilter} from '../../../src/lib/watches/index.js'
 import {fixtures} from '../../fixtures/loader.js'
 
 describe('tsqFilter', () => {

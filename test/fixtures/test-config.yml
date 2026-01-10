@@ -1,16 +1,17 @@
-checksets:
-  - include: 'package.json'
-    checks:
-      - actions:
-          - urgency: 1
-            template: |
-              # Test Report
+concerns:
+  test-concern:
+    signals:
+      - watch:
+          include: 'package.json'
+          type: 'jq'
+          query: '.dependencies'
+        report:
+          type: 'handlebars'
+          template: |
+            # Test Report
 
-              Found changes in dependencies.
+            Found changes in dependencies.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: 'jq'
-            query: '.dependencies'
+            ```diff
+            {{diffText}}
+            ```

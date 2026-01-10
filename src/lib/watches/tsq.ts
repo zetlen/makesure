@@ -196,30 +196,3 @@ export const tsqFilter: FilterApplier<TsqFilterConfig> = {
     return processFilter(versions, extractNodes)
   },
 }
-
-/**
- * Apply a tree-sitter query filter to extract matching nodes from source code.
- * @deprecated Use tsqFilter.apply() with TsqFilterConfig instead
- */
-export async function applyTsqFilter(
-  versions: FileVersions,
-  args: string[],
-  filePath?: string,
-): Promise<FilterResult | null> {
-  if (args.length === 0) {
-    throw new Error('TSQ filter requires at least a query argument')
-  }
-
-  const [query, capture, language] = args
-
-  return tsqFilter.apply(
-    versions,
-    {
-      capture,
-      language: language as TsqSupportedExtension | undefined,
-      query,
-      type: 'tsq',
-    },
-    filePath,
-  )
-}

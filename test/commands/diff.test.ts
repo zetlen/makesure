@@ -60,7 +60,6 @@ describe('diff command', () => {
     it('returns empty JSON object when no changes', async () => {
       const {stdout} = await runCommand('diff HEAD HEAD --json')
       const result = JSON.parse(stdout)
-      expect(result).to.have.property('concerns').that.deep.equals({})
       expect(result).to.have.property('reports').that.is.an('array').that.is.empty
     })
   })
@@ -74,7 +73,7 @@ describe('diff command', () => {
       await execFileAsync('git', ['config', 'user.email', 'test@test.com'], {cwd: tempDir})
       await execFileAsync('git', ['config', 'user.name', 'Test'], {cwd: tempDir})
       // Create a minimal distill.yml
-      await writeFile(join(tempDir, 'distill.yml'), 'checksets: []')
+      await writeFile(join(tempDir, 'distill.yml'), 'concerns: {}')
       await writeFile(join(tempDir, 'test.txt'), 'hello')
       await execFileAsync('git', ['add', '.'], {cwd: tempDir})
       await execFileAsync('git', ['commit', '-m', 'initial'], {cwd: tempDir})
@@ -129,7 +128,6 @@ describe('diff command', () => {
     it('returns empty JSON object for clean working tree', async () => {
       const {stdout} = await runCommand(`diff --json --repo ${tempDir}`)
       const result = JSON.parse(stdout)
-      expect(result).to.have.property('concerns').that.deep.equals({})
       expect(result).to.have.property('reports').that.is.an('array').that.is.empty
     })
 
@@ -164,7 +162,7 @@ describe('diff command', () => {
 
     it('provides user-friendly error when not in a git repo', async () => {
       const nonGitDir = await mkdtemp(join(tmpdir(), 'not-git-'))
-      await writeFile(join(nonGitDir, 'distill.yml'), 'checksets: []')
+      await writeFile(join(nonGitDir, 'distill.yml'), 'concerns: {}')
       try {
         const {error} = await runCommand(`diff HEAD HEAD --repo ${nonGitDir}`)
         expect(error).to.exist
@@ -183,7 +181,6 @@ describe('diff command', () => {
   it('returns empty JSON object when no changes', async () => {
     const {stdout} = await runCommand('diff HEAD HEAD --json')
     const result = JSON.parse(stdout)
-    expect(result).to.have.property('concerns').that.deep.equals({})
     expect(result).to.have.property('reports').that.is.an('array').that.is.empty
   })
 
@@ -196,7 +193,7 @@ describe('diff command', () => {
       await execFileAsync('git', ['config', 'user.email', 'test@test.com'], {cwd: tempDir})
       await execFileAsync('git', ['config', 'user.name', 'Test'], {cwd: tempDir})
       // Create a minimal distill.yml
-      await writeFile(join(tempDir, 'distill.yml'), 'checksets: []')
+      await writeFile(join(tempDir, 'distill.yml'), 'concerns: {}')
       await writeFile(join(tempDir, 'test.txt'), 'hello')
       await execFileAsync('git', ['add', '.'], {cwd: tempDir})
       await execFileAsync('git', ['commit', '-m', 'initial'], {cwd: tempDir})
@@ -250,7 +247,6 @@ describe('diff command', () => {
     it('returns empty JSON object for clean working tree', async () => {
       const {stdout} = await runCommand(`diff --json --repo ${tempDir}`)
       const result = JSON.parse(stdout)
-      expect(result).to.have.property('concerns').that.deep.equals({})
       expect(result).to.have.property('reports').that.is.an('array').that.is.empty
     })
 

@@ -1,24 +1,23 @@
 import {minimatch} from 'minimatch'
 
-import type {ReportOutput} from '../actions/index.js'
-import type {Action, Check, DistillConfig, FileCheckset, UpdateConcernContextAction} from '../configuration/config.js'
+import type {DefinedBlock, DistillConfig, NotifyConfig, Signal} from '../configuration/config.js'
 import type {File, FileVersions} from '../diff/parser.js'
-import type {ConcernContext, ProcessingContext} from './types.js'
+import type {ReportOutput} from '../reports/index.js'
+import type {ProcessingContext} from './types.js'
 
-import {
-  executeReportAction,
-  executeUpdateConcernContextAction,
-  isReportAction,
-  isUpdateConcernContextAction,
-} from '../actions/index.js'
-import {applyFilter, type FilterResult} from '../filters/index.js'
+import {resolveReport, resolveSignal, resolveWatch} from '../configuration/resolver.js'
+import {executeReport} from '../reports/index.js'
+import {applyWatch} from '../watches/index.js'
 
-/** Result of processing files through all checksets */
+/** Result of processing files through all concerns */
 export interface ProcessingResult {
-  concerns: ConcernContext
+  /** All reports generated */
   reports: ReportOutput[]
 }
 
+/**
+ * Process files through all concerns and their signals.
+ */
 export async function processFiles(
   files: File[],
   config: DistillConfig,
@@ -27,135 +26,80 @@ export async function processFiles(
   const reports: ReportOutput[] = []
 
   for (const file of files) {
-    for (const checkset of config.checksets) {
-      // eslint-disable-next-line no-await-in-loop
-      const rulesetReports = await processCheckset({checkset, context, file})
-      reports.push(...rulesetReports)
+    for (const [concernId, concern] of Object.entries(config.concerns)) {
+      for (const signalRef of concern.signals) {
+        // eslint-disable-next-line no-await-in-loop
+        const signalReports = await processSignal({
+          concernId,
+          context,
+          defined: config.defined,
+          file,
+          signalRef,
+        })
+        reports.push(...signalReports)
+      }
     }
   }
 
-  return {concerns: context.concerns, reports}
+  return {reports}
 }
 
-/** Options for processing a checkset against a file */
-interface ProcessChecksetOptions {
-  checkset: FileCheckset
+/** Options for processing a signal against a file */
+interface ProcessSignalOptions {
+  concernId: string
   context: ProcessingContext
+  defined?: DefinedBlock
   file: File
+  signalRef: Signal | {use: string}
 }
 
-async function processCheckset(options: ProcessChecksetOptions): Promise<ReportOutput[]> {
-  const {checkset, context, file} = options
+/**
+ * Process a single signal against a file.
+ * Returns reports if the signal matches and produces output.
+ */
+async function processSignal(options: ProcessSignalOptions): Promise<ReportOutput[]> {
+  const {context, defined, file, signalRef} = options
   const filePath = file.newPath || file.oldPath
 
-  if (!minimatch(filePath, checkset.include)) {
+  // Resolve the signal reference
+  const signal = resolveSignal(signalRef, defined)
+
+  // Resolve the watch reference
+  const watch = resolveWatch(signal.watch, defined)
+
+  // Check if file matches the watch's include pattern(s)
+  if (!matchesInclude(filePath, watch.include)) {
     return []
   }
 
+  // Get file versions for comparison
   const versions = await getFileVersions(file, context)
-  const reports: ReportOutput[] = []
 
-  for (const check of checkset.checks) {
-    // eslint-disable-next-line no-await-in-loop
-    const checkReports = await processCheck({
-      check,
-      concernIds: checkset.concerns,
-      context,
-      filePath,
-      versions,
-    })
-    reports.push(...checkReports)
+  // Apply the watch extraction
+  const watchResult = await applyWatch(watch, versions, filePath)
+
+  if (!watchResult) {
+    return []
   }
 
-  return reports
-}
+  // Execute the report
+  const report = resolveReport(signal.report, defined)
+  const reportOutput = executeReport(report, watchResult, {filePath})
 
-/** Options for processing a single check */
-interface ProcessCheckOptions {
-  check: Check
-  concernIds?: string[]
-  context: ProcessingContext
-  filePath: string
-  versions: FileVersions
-}
-
-async function processCheck(options: ProcessCheckOptions): Promise<ReportOutput[]> {
-  const {check, concernIds, context, filePath, versions} = options
-  const reports: ReportOutput[] = []
-
-  // Apply filters - all must pass
-  let filterResult: FilterResult | null = null
-  for (const filter of check.filters) {
-    // eslint-disable-next-line no-await-in-loop
-    filterResult = await applyFilter(filter, versions, filePath)
-    if (!filterResult) {
-      return reports
-    }
+  // Attach notify config to report metadata for downstream processing
+  if (signal.notify) {
+    reportOutput.notify = signal.notify
   }
 
-  // Execute actions if we have a filter result
-  if (filterResult) {
-    processActions({
-      actions: check.actions,
-      concernIds,
-      context,
-      filePath,
-      filterResult,
-      reports,
-    })
-  }
-
-  return reports
+  return [reportOutput]
 }
 
-/** Options for processing actions from a triggered check */
-interface ProcessActionsOptions {
-  actions: Action[]
-  concernIds?: string[]
-  context: ProcessingContext
-  filePath: string
-  filterResult: FilterResult
-  reports: ReportOutput[]
-}
-
-function processActions(options: ProcessActionsOptions): void {
-  const {actions, concernIds, context, filePath, filterResult, reports} = options
-
-  for (const action of actions) {
-    if (isReportAction(action)) {
-      const report = executeReportAction(action, filterResult, {filePath})
-      reports.push(report)
-    } else if (isUpdateConcernContextAction(action)) {
-      applyConcernContextUpdates({action, concernIds, context, filePath, filterResult})
-    }
-  }
-}
-
-/** Options for applying concern context updates */
-interface ApplyConcernContextUpdatesOptions {
-  action: UpdateConcernContextAction
-  concernIds?: string[]
-  context: ProcessingContext
-  filePath: string
-  filterResult: FilterResult
-}
-
-function applyConcernContextUpdates(options: ApplyConcernContextUpdatesOptions): void {
-  const {action, concernIds, context, filePath, filterResult} = options
-
-  if (!concernIds) {
-    return
-  }
-
-  const updates = executeUpdateConcernContextAction(action, filterResult, {filePath})
-
-  for (const concernId of concernIds) {
-    if (!context.concerns[concernId]) {
-      context.concerns[concernId] = {}
-    }
-
-    context.concerns[concernId] = {...context.concerns[concernId], ...updates}
-  }
+/**
+ * Check if a file path matches an include pattern (string or array of strings).
+ */
+function matchesInclude(filePath: string, include: string | string[]): boolean {
+  const patterns = Array.isArray(include) ? include : [include]
+  return patterns.some((pattern) => minimatch(filePath, pattern))
 }
 
 /**
@@ -176,4 +120,14 @@ async function getFileVersions(file: File, context: ProcessingContext): Promise<
   }
 
   return {newContent, oldContent}
+}
+
+// =============================================================================
+// EXTENDED REPORT OUTPUT (with notify info)
+// =============================================================================
+
+declare module '../reports/index.js' {
+  interface ReportOutput {
+    notify?: NotifyConfig
+  }
 }

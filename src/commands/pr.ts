@@ -98,7 +98,7 @@ Requires GITHUB_TOKEN environment variable for authentication.`
 
     if (!diffString.trim()) {
       if (this.jsonEnabled()) {
-        return {concerns: {}, reports: []}
+        return {reports: []}
       }
 
       this.log('No changes found in PR #%d', number)
@@ -129,7 +129,6 @@ Requires GITHUB_TOKEN environment variable for authentication.`
     }
 
     const result = await processFiles(files, config, {
-      concerns: {},
       contentProvider,
       refs,
     })

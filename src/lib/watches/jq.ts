@@ -62,11 +62,3 @@ export const jqFilter: FilterApplier<JqFilterConfig> = {
     return createFilterResult(leftArtifact, rightArtifact, false)
   },
 }
-
-/**
- * Apply a jq filter to file versions and return the filter result.
- * @deprecated Use jqFilter.apply() with JqFilterConfig instead
- */
-export async function applyJqFilter(versions: FileVersions, args: string[]): Promise<FilterResult | null> {
-  return jqFilter.apply(versions, {query: args[0], type: 'jq'})
-}

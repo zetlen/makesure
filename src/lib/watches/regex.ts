@@ -91,19 +91,3 @@ export const regexFilter: FilterApplier<RegexFilterConfig> = {
     return processFilter(versions, extractMatches)
   },
 }
-
-/**
- * Apply a regex filter to extract matching lines from content.
- * @deprecated Use regexFilter.apply() with RegexFilterConfig instead
- */
-export async function applyRegexFilter(versions: FileVersions, args: string[]): Promise<FilterResult | null> {
-  if (args.length === 0) {
-    throw new Error('Regex filter requires at least a pattern argument')
-  }
-
-  return regexFilter.apply(versions, {
-    flags: args[1],
-    pattern: args[0],
-    type: 'regex',
-  })
-}

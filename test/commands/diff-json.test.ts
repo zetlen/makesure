@@ -5,7 +5,6 @@ describe('diff JSON', () => {
   it('outputs empty JSON object when no changes', async () => {
     const {stdout} = await runCommand('diff HEAD HEAD --json')
     const json = JSON.parse(stdout)
-    expect(json).to.have.property('concerns').that.deep.equals({})
     expect(json).to.have.property('reports').that.is.an('array').that.is.empty
   })
 

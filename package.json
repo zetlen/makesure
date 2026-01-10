@@ -84,7 +84,7 @@
     "dogfood": "npm run build && ./bin/run.js diff HEAD . --json",
     "dogfood:pr": "npm run build && ./bin/run.js pr --json",
     "format": "prettier --write",
-    "generate-schema": "ts-json-schema-generator --no-type-check --path lib/configuration/config.ts --type DistillConfig -o distill-schema.json",
+    "generate-schema": "ts-json-schema-generator --no-type-check --path src/lib/configuration/config.ts --type DistillConfig -o distill-schema.json",
     "lint": "eslint",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",

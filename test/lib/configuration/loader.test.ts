@@ -2,6 +2,7 @@ import {expect} from 'chai'
 import {dirname, resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
+import {Signal} from '../../../src/lib/configuration/config.js'
 import {loadConfig} from '../../../src/lib/configuration/loader.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -11,24 +12,29 @@ describe('configuration/loader', () => {
     const configPath = resolve(__dirname, '../../fixtures/test-config.yml')
     const config = await loadConfig(configPath)
 
-    expect(config).to.have.property('checksets')
-    expect(config.checksets).to.be.an('array').with.lengthOf(1)
-    expect(config.checksets[0]).to.have.property('include', 'package.json')
+    expect(config).to.have.property('concerns')
+    expect(config.concerns).to.be.an('object')
+    expect(config.concerns['test-concern']).to.exist
   })
 
-  it('parses nested rule structures', async () => {
+  it('parses nested signal structures', async () => {
     const configPath = resolve(__dirname, '../../fixtures/test-config.yml')
     const config = await loadConfig(configPath)
 
-    const checkset = config.checksets[0]
-    expect(checkset.checks).to.be.an('array').with.lengthOf(1)
+    const concern = config.concerns['test-concern']
+    expect(concern.signals).to.be.an('array').with.lengthOf(1)
 
-    const check = checkset.checks[0]
-    expect(check.filters).to.be.an('array').with.lengthOf(1)
-    expect(check.filters[0]).to.deep.include({query: '.dependencies', type: 'jq'})
+    // Cast to Signal since we know the test fixture uses inline signals
+    const signal = concern.signals[0] as Signal
+    expect(signal).to.have.property('watch')
+    expect(signal.watch).to.deep.include({
+      include: 'package.json',
+      query: '.dependencies',
+      type: 'jq',
+    })
 
-    expect(check.actions).to.be.an('array').with.lengthOf(1)
-    expect(check.actions[0]).to.have.property('urgency', 1)
-    expect(check.actions[0]).to.have.property('template').that.includes('Test Report')
+    expect(signal).to.have.property('report')
+    expect(signal.report).to.have.property('type', 'handlebars')
+    expect(signal.report).to.have.property('template').that.includes('Test Report')
   })
 })

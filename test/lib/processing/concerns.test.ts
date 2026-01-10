@@ -6,37 +6,21 @@ import {processFiles} from '../../../src/lib/processing/runner.js'
 import {ProcessingContext} from '../../../src/lib/processing/types.js'
 
 describe('Concerns Processing', () => {
-  it('updates concern context when action triggers', async () => {
+  it('generates a report when a signal is triggered', async () => {
     const config: DistillConfig = {
-      checksets: [
-        {
-          checks: [
-            {
-              actions: [
-                {
-                  set: {
-                    foundFoo: 'true',
-                  },
-                },
-              ],
-              filters: [
-                {
-                  pattern: 'foo',
-                  type: 'regex',
-                },
-              ],
-            },
-          ],
-          concerns: ['my-concern'],
-          include: '*.ts',
-        },
-      ],
       concerns: {
         'my-concern': {
-          stakeholders: [
+          signals: [
             {
-              contactMethod: 'email',
-              name: 'Team A',
+              report: {
+                template: 'Found foo',
+                type: 'handlebars',
+              },
+              watch: {
+                include: '*.ts',
+                pattern: 'foo',
+                type: 'regex',
+              },
             },
           ],
         },
@@ -44,7 +28,6 @@ describe('Concerns Processing', () => {
     }
 
     const context: ProcessingContext = {
-      concerns: {},
       contentProvider: async (ref) => (ref === 'HEAD' ? 'foo' : ''),
       refs: {base: 'BASE', head: 'HEAD'},
     }
@@ -64,8 +47,9 @@ describe('Concerns Processing', () => {
       },
     ]
 
-    await processFiles(files, config, context)
+    const result = await processFiles(files, config, context)
 
-    expect(context.concerns['my-concern']).to.deep.equal({foundFoo: 'true'})
+    expect(result.reports).to.have.length(1)
+    expect(result.reports[0].content).to.include('Found foo')
   })
 })

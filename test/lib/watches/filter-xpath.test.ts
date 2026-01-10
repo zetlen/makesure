@@ -1,6 +1,6 @@
 import {expect} from 'chai'
 
-import {xpathFilter} from '../../../src/lib/filters/index.js'
+import {xpathFilter} from '../../../src/lib/watches/index.js'
 import {fixtures} from '../../fixtures/loader.js'
 describe('xpathFilter', () => {
   it('extracts project version from pom.xml', async () => {

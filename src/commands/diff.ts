@@ -68,7 +68,7 @@ When using --json, a "lineRange" field is included. Note that this range refers 
 
     // No changes detected - exit gracefully
     if (!resolved) {
-      return this.jsonEnabled() ? {concerns: {}, reports: []} : undefined
+      return this.jsonEnabled() ? {reports: []} : undefined
     }
 
     const {base, diffOptions, head} = resolved
@@ -86,7 +86,7 @@ When using --json, a "lineRange" field is included. Note that this range refers 
     const diffText = await getGitDiff(base, head, repoPath, diffOptions)
     if (!diffText.trim()) {
       if (this.jsonEnabled()) {
-        return {concerns: {}, reports: []}
+        return {reports: []}
       }
 
       this.log('No changes between %s and %s', base, head)
@@ -97,7 +97,7 @@ When using --json, a "lineRange" field is included. Note that this range refers 
     const {files} = parseDiff(diffText)
     if (files.length === 0) {
       if (this.jsonEnabled()) {
-        return {concerns: {}, reports: []}
+        return {reports: []}
       }
 
       this.log('No files found in diff')
@@ -121,7 +121,6 @@ When using --json, a "lineRange" field is included. Note that this range refers 
     }
 
     const result = await processFiles(files, config, {
-      concerns: {},
       contentProvider,
       refs,
     })

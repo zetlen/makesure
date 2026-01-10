@@ -1,500 +1,439 @@
 # yaml-language-server: $schema=./distill-schema.json
 
 # =============================================================================
-# CONCERNS & STAKEHOLDERS
+# DISTILL CONFIGURATION
 # =============================================================================
+# This configuration uses the distill structure:
+# - concerns: Areas of governance interest with signals
+# - signals: watch + report + notify combined
+# - defined: Reusable watches, reports, and signals
+# =============================================================================
+
 concerns:
-  cli-interface:
-    stakeholders:
-      - name: Product Team
-        description: Ensures CLI changes align with product direction and user experience
-        contactMethod: ruthless-pm@distill.dev
-      - name: Principal Engineer
-        description: Reviews CLI changes for adoption impact on large teams
-        contactMethod: principal-engineer@distill.dev
-
-  performance:
-    stakeholders:
-      - name: Performance Monarch
-        description: Evaluates performance implications of changes to filters and processing
-        contactMethod: performance-monarch@distill.dev
-
-  architecture:
-    stakeholders:
-      - name: Principal Engineer
-        description: Reviews architectural changes for maintainability and scalability
-        contactMethod: principal-engineer@distill.dev
-      - name: Product Team
-        description: Ensures architectural changes support product roadmap
-        contactMethod: ruthless-pm@distill.dev
-
+  # ===========================================================================
+  # SECURITY
+  # ===========================================================================
   security:
-    stakeholders:
-      - name: Security Team
-        description: Reviews changes for security implications
-        contactMethod: security-team@distill.dev
+    signals:
+      # Runtime dependencies
+      - watch:
+          include: 'package.json'
+          type: jq
+          query: '.dependencies | del(.workerd)'
+        report:
+          type: handlebars
+          template: |
+            # Runtime dependency changed
 
-checksets:
-  # =============================================================================
-  # PACKAGE.JSON CHECKS
-  # =============================================================================
-  - include: 'package.json'
-    concerns:
-      - security
-    checks:
-      # Runtime dependencies (excluding frequently-updated ones)
-      - actions:
-          - urgency: 2
-            template: |
-              # Runtime dependency changed
+            A runtime dependency has changed. Review for security and compatibility.
 
-              A runtime dependency has changed. Review for security and compatibility.
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@security-team'
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.dependencies | del(.workerd)'
+      # Docker base image changes
+      - watch:
+          include: 'Dockerfile'
+          type: regex
+          pattern: '^FROM (?<base_image>.+)$'
+        report:
+          type: handlebars
+          template: |
+            # Docker base image changed
 
-      # Dev dependencies
-      - actions:
-          - urgency: 1
-            template: |
-              # Dev dependency changed
+            The base image has changed. Verify compatibility and security.
 
-              A development dependency has changed.
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@platform-team'
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.devDependencies'
+      # Docker packages
+      - watch:
+          include: 'Dockerfile'
+          type: regex
+          pattern: '^RUN apk add (?<packages>.+)$'
+        report:
+          type: handlebars
+          template: |
+            # Docker packages changed
 
-      # NPM scripts
-      - actions:
-          - urgency: 2
-            template: |
-              # NPM scripts modified
+            System packages installed in the container have changed.
 
-              Build/test scripts have changed. Ensure CI/CD pipelines are updated if needed.
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@platform-team'
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.scripts'
-
-      # Node engine requirement
-      - actions:
-          - urgency: 3
-            template: |
-              # Node.js version requirement changed
-
-              The required Node.js version has changed. Update CI environments and documentation.
-
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.engines'
-
-      # oclif configuration
-      - actions:
-          - urgency: 2
-            template: |
-              # oclif CLI configuration changed
-
-              The oclif plugin/command configuration has changed.
-
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.oclif'
-
-  # =============================================================================
-  # CLI COMMAND INTERFACE CHECKS
-  # =============================================================================
-  - include: 'src/commands/**/*.ts'
-    concerns:
-      - cli-interface
-    checks:
-      # Semantic Check: New Command Created
-      - actions:
-          - urgency: 1
-            template: |
-              # New Command Detected
-
-              A new command class has been created: `{{extract.name}}`
-
-              ```typescript
-              {{diffText}}
-              ```
-        filters:
-          - type: tsq
-            query: |
-              (class_declaration
-                name: (type_identifier) @name
-                extends_clause: (class_heritage
-                  (expression_with_type_arguments
-                    (identifier) @base_class
-                    (#eq? @base_class "Command")
-                  )
+  # ===========================================================================
+  # CLI INTERFACE
+  # ===========================================================================
+  cli-interface:
+    signals:
+      # New command detection
+      - watch:
+          include: 'src/commands/**/*.ts'
+          type: tsq
+          query: |
+            (class_declaration
+              name: (type_identifier) @name
+              (class_heritage
+                (extends_clause
+                  value: (identifier) @base_class
+                  (#eq? @base_class "BaseCommand")
                 )
-              ) @class_decl
-            capture: class_decl
+              )
+            ) @class_decl
+          capture: class_decl
+        report:
+          type: handlebars
+          template: |
+            # New CLI command detected
+
+            A new command class has been created.
+
+            ```typescript
+            {{diffText}}
+            ```
+        notify:
+          github: '@product-team'
 
       # Command arguments
-      - actions:
-          - urgency: 3
-            template: |
-              # CLI command arguments modified
+      - watch:
+          include: 'src/commands/**/*.ts'
+          type: ast-grep
+          language: typescript
+          pattern:
+            selector: public_field_definition
+            context: 'class C { static override args = $ARGS }'
+        report:
+          type: handlebars
+          template: |
+            # CLI command arguments modified
 
-              Command-line arguments have changed. This is a breaking change for users.
+            Command-line arguments have changed. This is a breaking change for users.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: ast-grep
-            language: typescript
-            pattern:
-              selector: public_field_definition
-              context: 'class C { static override args = $ARGS }'
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@product-team'
 
       # Command flags
-      - actions:
-          - urgency: 3
-            template: |
-              # CLI command flags modified
+      - watch:
+          include: 'src/commands/**/*.ts'
+          type: ast-grep
+          language: typescript
+          pattern:
+            selector: public_field_definition
+            context: 'class C { static override flags = $FLAGS }'
+        report:
+          type: handlebars
+          template: |
+            # CLI command flags modified
 
-              Command-line flags have changed. This may be a breaking change for users.
+            Command-line flags have changed. This may be a breaking change for users.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: ast-grep
-            language: typescript
-            pattern:
-              selector: public_field_definition
-              context: 'class C { static override flags = $FLAGS }'
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@product-team'
 
       # Command description
-      - actions:
-          - urgency: 1
-            template: |
-              # CLI command description updated
+      - watch:
+          include: 'src/commands/**/*.ts'
+          type: ast-grep
+          language: typescript
+          pattern:
+            selector: public_field_definition
+            context: 'class C { static override description = $DESC }'
+        report:
+          type: handlebars
+          template: |
+            # CLI command description updated
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: ast-grep
-            language: typescript
-            pattern:
-              selector: public_field_definition
-              context: 'class C { static override description = $DESC }'
+            ```diff
+            {{diffText}}
+            ```
 
-  # =============================================================================
-  # CONFIGURATION SCHEMA CHECKS
-  # =============================================================================
-  - include: 'src/lib/configuration/config.ts'
-    concerns:
-      - architecture
-    checks:
-      # FilterConfig union type - tracks when filter types are added/removed
-      - actions:
-          - urgency: 3
-            template: |
-              # FilterConfig type changed
+  # ===========================================================================
+  # PERFORMANCE
+  # ===========================================================================
+  performance:
+    signals:
+      # Watch router switch statement
+      - watch:
+          include: 'src/lib/watches/index.ts'
+          type: ast-grep
+          language: typescript
+          pattern: 'switch ($CONFIG.type) { $$$CASES }'
+        report:
+          type: handlebars
+          template: |
+            # Watch routing logic changed
 
-              The union of supported filter types has changed. Update documentation and schema.
+            The applyWatch switch statement has changed. A watch type may have been added or removed.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: tsq
-            query: '(type_alias_declaration name: (type_identifier) @name (#eq? @name "FilterConfig")) @decl'
-            capture: decl
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@performance-team'
+
+      # Watch config type definitions
+      - watch:
+          include: 'src/lib/watches/*.ts'
+          type: tsq
+          query: '[(type_alias_declaration name: (type_identifier) @name) @type (interface_declaration name: (type_identifier) @name) @iface]'
+        report:
+          type: handlebars
+          template: |
+            # Watch config type changed
+
+            A watch's configuration type has been modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # ARCHITECTURE
+  # ===========================================================================
+  architecture:
+    signals:
+      # WatchConfig union type
+      - watch:
+          include: 'src/lib/configuration/config.ts'
+          type: tsq
+          query: '(type_alias_declaration name: (type_identifier) @name (#eq? @name "WatchConfig")) @decl'
+          capture: decl
+        report:
+          type: handlebars
+          template: |
+            # WatchConfig type changed
+
+            The union of supported watch types has changed. Update documentation and schema.
+
+            ```diff
+            {{diffText}}
+            ```
+        notify:
+          github: '@architecture-team'
 
       # DistillConfig interface
-      - actions:
-          - urgency: 3
-            template: |
-              # DistillConfig interface changed
+      - watch:
+          include: 'src/lib/configuration/config.ts'
+          type: tsq
+          query: '(interface_declaration name: (type_identifier) @name (#eq? @name "DistillConfig")) @decl'
+          capture: decl
+        report:
+          type: handlebars
+          template: |
+            # DistillConfig interface changed
 
-              The root configuration interface has changed. Regenerate schema with `npm run generate-schema`.
+            The root configuration interface has changed. Regenerate schema with `npm run generate-schema`.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: tsq
-            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "DistillConfig")) @decl'
-            capture: decl
+            ```diff
+            {{diffText}}
+            ```
 
-      # Check interface
-      - actions:
-          - urgency: 2
-            template: |
-              # Check interface changed
+      # Signal interface
+      - watch:
+          include: 'src/lib/configuration/config.ts'
+          type: tsq
+          query: '(interface_declaration name: (type_identifier) @name (#eq? @name "Signal")) @decl'
+          capture: decl
+        report:
+          type: handlebars
+          template: |
+            # Signal interface changed
 
-              The Check interface has changed. This affects how rules are defined.
+            The Signal interface has changed. This affects how rules are defined.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: tsq
-            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "Check")) @decl'
-            capture: decl
+            ```diff
+            {{diffText}}
+            ```
 
-      # FileCheckset interface
-      - actions:
-          - urgency: 2
-            template: |
-              # FileCheckset interface changed
+  # ===========================================================================
+  # BUILD & TOOLING
+  # ===========================================================================
+  build-tooling:
+    signals:
+      # Dev dependencies
+      - watch:
+          include: 'package.json'
+          type: jq
+          query: '.devDependencies'
+        report:
+          type: handlebars
+          template: |
+            # Dev dependency changed
 
-              The FileCheckset interface has changed.
+            A development dependency has changed.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: tsq
-            query: '(interface_declaration name: (type_identifier) @name (#eq? @name "FileCheckset")) @decl'
-            capture: decl
+            ```diff
+            {{diffText}}
+            ```
 
-  # =============================================================================
-  # FILTER IMPLEMENTATION CHECKS
-  # =============================================================================
-  - include: 'src/lib/filters/index.ts'
-    concerns:
-      - performance
-      - architecture
-    checks:
-      # Filter router switch statement
-      - actions:
-          - urgency: 2
-            template: |
-              # Filter routing logic changed
+      # NPM scripts
+      - watch:
+          include: 'package.json'
+          type: jq
+          query: '.scripts'
+        report:
+          type: handlebars
+          template: |
+            # NPM scripts modified
 
-              The applyFilter switch statement has changed. A filter may have been added or removed.
+            Build/test scripts have changed. Ensure CI/CD pipelines are updated if needed.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: ast-grep
-            language: typescript
-            pattern: 'switch ($CONFIG.type) { $$$CASES }'
+            ```diff
+            {{diffText}}
+            ```
 
-  - include: 'src/lib/filters/*.ts'
-    concerns:
-      - performance
-    checks:
-      # Filter config type definitions
-      - actions:
-          - urgency: 2
-            template: |
-              # Filter config type changed
+      # Node engine requirement
+      - watch:
+          include: 'package.json'
+          type: jq
+          query: '.engines'
+        report:
+          type: handlebars
+          template: |
+            # Node.js version requirement changed
 
-              A filter's configuration type has been modified.
+            The required Node.js version has changed. Update CI environments and documentation.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: tsq
-            query: '[(type_alias_declaration name: (type_identifier) @name) @type (interface_declaration name: (type_identifier) @name) @iface]'
+            ```diff
+            {{diffText}}
+            ```
 
-  # =============================================================================
-  # TYPESCRIPT CONFIGURATION
-  # =============================================================================
-  - include: 'tsconfig.json'
-    checks:
-      - actions:
-          - urgency: 2
-            template: |
-              # TypeScript compiler options changed
+      # oclif configuration
+      - watch:
+          include: 'package.json'
+          type: jq
+          query: '.oclif'
+        report:
+          type: handlebars
+          template: |
+            # oclif CLI configuration changed
 
-              TypeScript configuration has changed. This may affect build output.
+            The oclif plugin/command configuration has changed.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.compilerOptions'
+            ```diff
+            {{diffText}}
+            ```
 
-  # =============================================================================
-  # DOCKER CONFIGURATION
-  # =============================================================================
-  - include: 'Dockerfile'
-    concerns:
-      - security
-    checks:
-      # Base image changes
-      - actions:
-          - urgency: 3
-            template: |
-              # Docker base image changed
+      # TypeScript compiler options
+      - watch:
+          include: 'tsconfig.json'
+          type: jq
+          query: '.compilerOptions'
+        report:
+          type: handlebars
+          template: |
+            # TypeScript compiler options changed
 
-              The base image has changed. Verify compatibility and security.
+            TypeScript configuration has changed. This may affect build output.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: '^FROM (?<base_image>.+)$'
+            ```diff
+            {{diffText}}
+            ```
 
-      # Installed packages
-      - actions:
-          - urgency: 2
-            template: |
-              # Docker packages changed
-
-              System packages installed in the container have changed.
-
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: '^RUN apk add (?<packages>.+)$'
-
-  # =============================================================================
-  # DEVELOPMENT TOOLING
-  # =============================================================================
-  - include: 'mise.toml'
-    checks:
-      - actions:
-          - urgency: 1
-            template: |
-              # Development tool versions changed
-
-              Tool versions in mise.toml have been updated.
-
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: "\\[tools\\][\\s\\S]+"
-            flags: 's'
-
-  - include: 'lefthook.yml'
-    checks:
-      - actions:
-          - urgency: 2
-            template: |
-              # Git hooks configuration changed
-
-              Pre-commit or other git hooks have been modified.
-
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: "pre-commit:[\\s\\S]+"
-            flags: 's'
-
-  # =============================================================================
+  # ===========================================================================
   # DOCUMENTATION
-  # =============================================================================
-  - include: 'README.md'
-    checks:
-      - actions:
-          - urgency: 1
-            template: |
-              # README commands section changed
+  # ===========================================================================
+  documentation:
+    signals:
+      # README commands section
+      - watch:
+          include: 'README.md'
+          type: regex
+          pattern: '<!-- commands -->[\s\S]+<!-- commandsstop -->'
+          flags: 's'
+        report:
+          type: handlebars
+          template: |
+            # README commands section changed
 
-              The auto-generated commands documentation has been updated.
+            The auto-generated commands documentation has been updated.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: '<!-- commands -->[\\s\\S]+<!-- commandsstop -->'
-            flags: 's'
+            ```diff
+            {{diffText}}
+            ```
 
-      - actions:
-          - urgency: 1
-            template: |
-              # README usage section changed
+      # README usage section
+      - watch:
+          include: 'README.md'
+          type: regex
+          pattern: '<!-- usage -->[\s\S]+<!-- usagestop -->'
+          flags: 's'
+        report:
+          type: handlebars
+          template: |
+            # README usage section changed
 
-              The usage documentation has been updated.
+            The usage documentation has been updated.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: '<!-- usage -->[\\s\\S]+<!-- usagestop -->'
-            flags: 's'
+            ```diff
+            {{diffText}}
+            ```
 
-  - include: 'CLAUDE.md'
-    checks:
-      - actions:
-          - urgency: 0
-            template: |
-              # CLAUDE.md updated
+      # CLAUDE.md
+      - watch:
+          include: 'CLAUDE.md'
+          type: regex
+          pattern: "## [\\s\\S]+"
+          flags: 's'
+        report:
+          type: handlebars
+          template: |
+            # CLAUDE.md updated
 
-              AI assistant instructions have been modified.
+            AI assistant instructions have been modified.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: "## [\\s\\S]+"
-            flags: 's'
+            ```diff
+            {{diffText}}
+            ```
 
-  # =============================================================================
-  # TEST FIXTURES
-  # =============================================================================
-  - include: 'test/fixtures/**/*.yml'
-    checks:
-      - actions:
-          - urgency: 1
-            template: |
-              # Test fixture configuration changed
+  # ===========================================================================
+  # TESTING
+  # ===========================================================================
+  testing:
+    signals:
+      # Test fixture configuration
+      - watch:
+          include: 'test/fixtures/**/*.yml'
+          type: regex
+          pattern: '.*'
+          flags: 's'
+        report:
+          type: handlebars
+          template: |
+            # Test fixture configuration changed
 
-              A YAML test fixture has been modified. Verify tests still pass.
+            A YAML test fixture has been modified. Verify tests still pass.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: regex
-            pattern: '.*'
-            flags: 's'
+            ```diff
+            {{diffText}}
+            ```
 
-  # =============================================================================
-  # SCHEMA
-  # =============================================================================
-  - include: 'distill-schema.json'
-    checks:
-      - actions:
-          - urgency: 1
-            template: |
-              # JSON Schema updated
+      # JSON Schema
+      - watch:
+          include: 'distill-schema.json'
+          type: jq
+          query: '.definitions | keys'
+        report:
+          type: handlebars
+          template: |
+            # JSON Schema updated
 
-              The distill configuration schema has changed.
+            The distill configuration schema has changed.
 
-              ```diff
-              {{diffText}}
-              ```
-        filters:
-          - type: jq
-            query: '.definitions | keys'
+            ```diff
+            {{diffText}}
+            ```

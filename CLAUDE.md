@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`distill` is an oclif-based CLI tool that processes code changes with semantic rules. It analyzes git diffs and applies configurable rules to generate reports or run actions based on filtered file changes.
+`distill` is an oclif-based CLI tool that processes code changes with semantic rules. It analyzes git diffs and applies configurable signals to generate reports based on watched file changes.
 
 ## Essential Commands
 
@@ -70,22 +70,22 @@ npm run build:docker
 
 The core of distill is a rule-based configuration system defined in `src/lib/configuration/config.ts`:
 
-- **FileCheckset**: Maps file patterns (globs via `include`) to checks
-- **Check**: Contains filters and actions to apply to matching files
-- **Filter**: Processes files to extract relevant content for comparison
-  - Filters run on both sides of a diff to produce artifacts A and B
+- **DistillConfig**: Root configuration with `concerns` and optional `defined` block
+- **Concern**: An area of governance interest with signals
+- **Signal**: Combines watch + report + notify (what to watch, how to report, who to notify)
+- **Watch**: File patterns (`include`) + extraction config (type, query/pattern)
+  - Watches run on both sides of a diff to produce artifacts A and B
   - Returns a `FilterResult` containing the diff text, both artifacts, and optional metadata:
     - `lineRange`: Line numbers within the filtered artifact (for precise code location)
     - `context`: Symbolic context array (e.g., surrounding class/function names for ast-grep, tsq, regex)
-- **Action**: What to do when a check triggers
-  - **ReportAction**: Generates text reports using Handlebars templates with markdown support
-  - **RunAction**: Executes arbitrary commands with environment variables from the filter results
+- **Report**: Output format with `type` (currently only 'handlebars') and `template`
+- **Notify**: Dictionary of notification channels (github, slack, email, webhook, jira)
 
 Configuration is stored in `distill.yml` at the project root, with JSON schema validation available via `distill-schema.json`.
 
-### Available Filters
+### Available Watch Types
 
-| Filter     | Description                         | External Dependency         |
+| Watch Type | Description                         | External Dependency         |
 | ---------- | ----------------------------------- | --------------------------- |
 | `jq`       | JSON processing with jq queries     | `jq` CLI                    |
 | `regex`    | Regular expression pattern matching | None                        |
@@ -93,54 +93,54 @@ Configuration is stored in `distill.yml` at the project root, with JSON schema v
 | `tsq`      | Tree-sitter AST queries             | None (uses web-tree-sitter) |
 | `ast-grep` | ast-grep pattern matching           | `ast-grep` CLI              |
 
-### Filter Configuration Examples
+### Configuration Examples
 
 ```yaml
-checksets:
-  # jq filter for JSON
-  - include: 'package.json'
-    checks:
-      - filters:
-          - type: jq
-            query: '.dependencies'
-        actions:
-          - urgency: 1
-            template: 'Dependencies changed'
+concerns:
+  security:
+    signals:
+      # jq watch for JSON
+      - watch:
+          include: 'package.json'
+          type: jq
+          query: '.dependencies'
+        report:
+          type: handlebars
+          template: 'Dependencies changed'
+        notify:
+          github: '@security-team'
 
-  # ast-grep with simple pattern
-  - include: 'src/**/*.ts'
-    checks:
-      - filters:
-          - type: ast-grep
-            language: typescript
-            pattern: 'function $NAME($$$PARAMS) { $$$BODY }'
-        actions:
-          - urgency: 1
-            template: 'Function changed'
+      # ast-grep with simple pattern
+      - watch:
+          include: 'src/**/*.ts'
+          type: ast-grep
+          language: typescript
+          pattern: 'function $NAME($$$PARAMS) { $$$BODY }'
+        report:
+          type: handlebars
+          template: 'Function changed'
 
-  # ast-grep with context/selector for precise matching
-  - include: 'src/commands/**/*.ts'
-    checks:
-      - filters:
-          - type: ast-grep
-            language: typescript
-            pattern:
-              context: 'class C { static override args = $ARGS }'
-              selector: public_field_definition
-        actions:
-          - urgency: 1
-            template: 'Command args changed'
+      # ast-grep with context/selector for precise matching
+      - watch:
+          include: 'src/commands/**/*.ts'
+          type: ast-grep
+          language: typescript
+          pattern:
+            context: 'class C { static override args = $ARGS }'
+            selector: public_field_definition
+        report:
+          type: handlebars
+          template: 'Command args changed'
 
-  # regex with dotAll flag for multiline
-  - include: 'README.md'
-    checks:
-      - filters:
-          - type: regex
-            pattern: '<!-- start -->.*<!-- end -->'
-            flags: 's'
-        actions:
-          - urgency: 1
-            template: 'Section changed'
+      # regex with dotAll flag for multiline
+      - watch:
+          include: 'README.md'
+          type: regex
+          pattern: '<!-- start -->.*<!-- end -->'
+          flags: 's'
+        report:
+          type: handlebars
+          template: 'Section changed'
 ```
 
 ### JSON Output Format
@@ -150,7 +150,6 @@ The `--json` flag outputs structured report data with enhanced metadata:
 ```typescript
 {
   content: string      // Rendered markdown report
-  urgency: number      // Priority level (0-3)
   metadata: {
     fileName: string
     diffText: string
@@ -167,9 +166,9 @@ The `--json` flag outputs structured report data with enhanced metadata:
 }
 ```
 
-**Important**: The `lineRange` refers to line numbers within the _filtered artifact_ (the extracted code snippet), not the original source file. This is especially relevant for filters like `jq` or `xpath` that transform the input.
+**Important**: The `lineRange` refers to line numbers within the _filtered artifact_ (the extracted code snippet), not the original source file. This is especially relevant for watches like `jq` or `xpath` that transform the input.
 
-The `context` array provides symbolic information about surrounding code structures (available for ast-grep, tsq, and regex filters), helping identify which class/function the change occurred in.
+The `context` array provides symbolic information about surrounding code structures (available for ast-grep, tsq, and regex watches), helping identify which class/function the change occurred in.
 
 ### Project Structure
 
@@ -179,20 +178,20 @@ The `context` array provides symbolic information about surrounding code structu
   - `pr.ts`: Analyzes GitHub PRs via API (extends BaseCommand)
 - `src/lib/`: Core library modules
   - `base-command.ts`: Abstract base command with shared flags and `enableJsonFlag`
-  - `configuration/`: Config types (`config.ts`) and YAML loader (`loader.ts`)
+  - `configuration/`: Config types (`config.ts`), YAML loader (`loader.ts`), reference resolver (`resolver.ts`)
   - `diff/`: Git diff parsing and file version retrieval (`parser.ts`)
   - `git/`: Git utilities for working tree status, remote detection, etc.
     - `utils.ts`: Functions for `getWorkingTreeStatus`, `isValidRef`, `getRemotes`, etc.
     - `index.ts`: Re-exports
-  - `filters/`: Filter implementations (jq, regex, xpath, tsq, ast-grep)
+  - `watches/`: Watch implementations (jq, regex, xpath, tsq, ast-grep)
     - `types.ts`: FilterResult interface with lineRange and context metadata
     - `utils.ts`: Shared utilities for extracting symbolic context
-  - `actions/`: Action implementations (report with Handlebars, JSON output)
+  - `reports/`: Report implementations (handlebars templates, JSON output)
   - `processing/`: Processing runner and types for ContentProvider abstraction
   - `tree-sitter.ts`: Tree-sitter language parsers and utilities
 - `test/`: Mocha/Chai tests using `@oclif/test`
   - `test/commands/`: Command tests (diff.test.ts, diff-json.test.ts, pr.test.ts)
-  - `test/lib/filters/`: Individual test files per filter type
+  - `test/lib/watches/`: Individual test files per watch type
   - `test/fixtures/`: Test fixture files for various languages
 - `bin/`: CLI executables (`dev.js` for development, `run.js` for production)
 
@@ -228,16 +227,16 @@ Commands extend `BaseCommand` from `src/lib/base-command.ts`, which provides:
 
 - Framework: Mocha with Chai assertions
 - oclif testing utilities via `@oclif/test`
-- Tests follow the pattern: `test/lib/filters/filter-*.test.ts` for each filter
+- Tests follow the pattern: `test/lib/watches/filter-*.test.ts` for each watch type
 - Run with `--forbid-only` to prevent committed `.only()` calls
-- 90 tests covering all filters and core functionality
+- 137 tests covering all watches and core functionality
 
 ### External Dependencies
 
 The following CLI tools must be installed for full functionality:
 
-- `jq` - for the jq filter
-- `ast-grep` - for the ast-grep filter
+- `jq` - for the jq watch
+- `ast-grep` - for the ast-grep watch
 
 These are managed via `mise.toml` for local development. In Docker, they're installed via `apk`.
 
@@ -258,19 +257,19 @@ These are managed via `mise.toml` for local development. In Docker, they're inst
 - **Schema Generation**: After changing config types in `src/lib/configuration/config.ts`, run `npm run generate-schema` to update `distill-schema.json`
 - **README Updates**: The README command documentation is auto-generated by oclif during `npm run prepack` or when running `npm run version`
 - **Dogfooding**: Run `npm run dogfood` to test distill on itself using the `distill.yml` in the repo root
-- **Self-Documentation**: The `distill.yml` file serves as both configuration for the project and a comprehensive example of all filter types
+- **Self-Documentation**: The `distill.yml` file serves as both configuration for the project and a comprehensive example of all watch types
 
 #### Key Files to Update Together
 
 When making changes, these files often need to be updated together:
 
-1. **Adding a new filter**:
-   - `src/lib/filters/<name>.ts` - Implementation
-   - `src/lib/filters/index.ts` - Add to router switch statement
-   - `src/lib/configuration/config.ts` - Add to FilterConfig union type
+1. **Adding a new watch type**:
+   - `src/lib/watches/<name>.ts` - Implementation
+   - `src/lib/watches/index.ts` - Add to router switch statement
+   - `src/lib/configuration/config.ts` - Add to WatchConfig union type
    - Run `npm run generate-schema` to update schema
-   - `test/lib/filters/filter-<name>.test.ts` - Add tests
-   - `CLAUDE.md` - Update filter table and examples
+   - `test/lib/watches/filter-<name>.test.ts` - Add tests
+   - `CLAUDE.md` - Update watch table and examples
 
 2. **Adding a new command**:
    - `src/commands/<name>.ts` - Extend `BaseCommand`, implement `run()` returning `JsonOutput | void`

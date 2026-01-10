@@ -3,39 +3,42 @@
 Process code changes with semantic rules
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/distill.svg)](https://npmjs.org/package/distill)
-[![Downloads/week](https://img.shields.io/npm/dw/distill.svg)](https://npmjs.org/package/distill)
+[![Version](https://img.shields.io/npm/v/@distill/cli.svg)](https://npmjs.org/package/@distill/cli)
+[![Downloads/week](https://img.shields.io/npm/dw/@distill/cli.svg)](https://npmjs.org/package/@distill/cli)
 
 <!-- toc -->
-* [distill](#distill)
-* [Usage](#usage)
-* [Configuration](#configuration)
-* [Commands](#commands)
+
+- [distill](#distill)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Commands](#commands)
 <!-- tocstop -->
 
 # Usage
 
 <!-- usage -->
+
 ```sh-session
 $ npm install -g @distill/cli
 $ distill COMMAND
 running command...
 $ distill (--version)
-@distill/cli/2.0.0 linux-x64 node-v24.12.0
+@distill/cli/2.0.0 darwin-arm64 node-v24.12.0
 $ distill --help [COMMAND]
 USAGE
   $ distill COMMAND
 ...
 ```
+
 <!-- usagestop -->
 
 # Configuration
 
-`distill` is configured via a `distill.yml` file in your repository root. You can define "checksets" to apply rules to specific files, and optionally group them by "concerns" to notify relevant "stakeholders".
+`distill` is configured via a `distill.yml` file in your repository root. You define **concerns** (areas of interest) containing **signals** that match files and apply **watches** (extraction filters) and **reports** (output templates).
 
 ## Concerns and Stakeholders
 
-You can define high-level **concerns** (e.g., "security", "ui-consistency") and map them to **stakeholders** (teams or individuals). Checksets can then be attached to these concerns.
+**Concerns** represent areas of interest (e.g., "security", "ui-consistency") with associated **stakeholders** (teams or individuals). Each concern contains **signals** that define what files to watch and how to process them.
 
 ```yaml
 concerns:
@@ -44,45 +47,70 @@ concerns:
       - name: Security Team
         contactMethod: github-reviewer-request
         description: Reviews security-sensitive changes
+
+    signals:
+      - watch:
+          include: 'src/auth/**/*.ts'
+          type: regex
+          pattern: 'password|secret'
+        report:
+          type: handlebars
+          template: 'Potential secret exposure in {{filePath}}'
+
   ui-consistency:
     stakeholders:
       - name: Design System Team
         contactMethod: github-comment-mention
 
-checksets:
-  - include: 'src/auth/**/*.ts'
-    concerns: ['security']
-    checks:
-      - filters:
-          - type: regex
-            pattern: 'password|secret'
-        actions:
-          - template: 'Potential secret exposure in {{filePath}}'
-            urgency: 10
-          # Update the shared context for this concern
-          - set:
-              hasSecrets: 'true'
+    signals:
+      - watch:
+          include: 'src/components/**/*.tsx'
+          type: ast-grep
+          language: tsx
+          pattern:
+            context: 'style={{...}}'
+            selector: 'jsx_attribute'
+        report:
+          type: handlebars
+          template: 'Avoid inline styles in {{filePath}}. Use standard classes.'
+```
 
-  - include: 'src/components/**/*.tsx'
-    concerns: ['ui-consistency']
-    checks:
-      - filters:
-          - type: ast-grep
-            language: tsx
-            pattern:
-              context: 'style={{...}}'
-              selector: 'jsx_attribute'
-        actions:
-          - template: 'Avoid inline styles in {{filePath}}. Use standard classes.'
-            urgency: 5
+## Reusable Definitions
+
+You can define reusable watches and reports in a `defined` block and reference them throughout your configuration:
+
+```yaml
+defined:
+  watches:
+    jq-deps:
+      type: jq
+      query: '.dependencies'
+  reports:
+    deps-report:
+      type: handlebars
+      template: |
+        Dependencies changed in {{filePath}}
+
+concerns:
+  dependencies:
+    stakeholders:
+      - name: Dev Team
+        contactMethod: github-comment-mention
+    signals:
+      - watch:
+          include: 'package.json'
+          use: '#defined/watches/jq-deps'
+        report:
+          use: '#defined/reports/deps-report'
 ```
 
 # Commands
 
 <!-- commands -->
-* [`distill diff [BASE] [HEAD]`](#distill-diff-base-head)
-* [`distill help [COMMAND]`](#distill-help-command)
-* [`distill pr [PR]`](#distill-pr-pr)
+
+- [`distill diff [BASE] [HEAD]`](#distill-diff-base-head)
+- [`distill help [COMMAND]`](#distill-help-command)
+- [`distill pr [PR]`](#distill-pr-pr)
 
 ## `distill diff [BASE] [HEAD]`
 
@@ -185,4 +213,5 @@ EXAMPLES
 ```
 
 _See code: [src/commands/pr.ts](https://github.com/zetlen/distill/blob/v2.0.0/src/commands/pr.ts)_
+
 <!-- commandsstop -->
