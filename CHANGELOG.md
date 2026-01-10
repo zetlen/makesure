@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/zetlen/distill/compare/cli-v2.0.0...cli-v3.0.0) (2026-01-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* Configuration structure redesigned around signals.
+
+### Code Refactoring
+
+* simplify configuration model with signals ([#25](https://github.com/zetlen/distill/issues/25)) ([6fea41a](https://github.com/zetlen/distill/commit/6fea41a7156ca91e190b7c358dfce75d1ac7b48e))
+
 ## [2.0.0](https://github.com/zetlen/distill/compare/cli-v1.1.0...cli-v2.0.0) (2026-01-09)
 
 
