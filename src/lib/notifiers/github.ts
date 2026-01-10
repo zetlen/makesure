@@ -10,8 +10,6 @@ export interface NotificationContext {
   repo: string
 }
 
-/* eslint-disable camelcase */
-
 export async function processNotifications(configs: NotifyConfig[], context: NotificationContext): Promise<void> {
   const mentions = new Set<string>()
   const reviewers = new Set<string>()
@@ -49,6 +47,7 @@ function parseList(input: string): string[] {
     .filter(Boolean)
 }
 
+/* eslint-disable camelcase */
 async function processMentions(mentions: Set<string>, context: NotificationContext) {
   if (mentions.size === 0) return
 
@@ -84,9 +83,12 @@ async function processReviewers(reviewers: Set<string>, context: NotificationCon
       // Clean up input
       const clean = reviewer.replace(/^@/, '')
 
-      // Simple heuristic: if it contains slash, it's likely org/team
+      // Simple heuristic: if it contains slash, it's likely org/team-slug format.
       if (clean.includes('/')) {
-        teams.push(clean.split('/')[1])
+        const teamSlug = clean.split('/')[1]
+        if (teamSlug) {
+          teams.push(teamSlug)
+        }
       } else {
         users.push(clean)
       }
@@ -125,19 +127,22 @@ async function processLabels(labels: Set<string>, context: NotificationContext) 
 async function processWorkflows(workflows: Set<string>, context: NotificationContext) {
   if (workflows.size === 0) return
 
-  /* eslint-disable no-await-in-loop */
-  for (const workflow of workflows) {
-    try {
-      await context.octokit.rest.actions.createWorkflowDispatch({
-        owner: context.owner,
-        ref: context.ref,
-        repo: context.repo,
-        workflow_id: workflow,
-      })
-    } catch (error) {
-      console.warn(`Failed to dispatch workflow ${workflow}:`, error)
+  const dispatches = [...workflows].map((workflow) =>
+    context.octokit.rest.actions.createWorkflowDispatch({
+      owner: context.owner,
+      ref: context.ref,
+      repo: context.repo,
+      workflow_id: workflow,
+    }),
+  )
+
+  const results = await Promise.allSettled(dispatches)
+
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'rejected') {
+      const workflow = [...workflows][index]
+      console.warn(`Failed to dispatch workflow ${workflow}:`, result.reason)
     }
   }
-  /* eslint-enable no-await-in-loop */
 }
 /* eslint-enable camelcase */

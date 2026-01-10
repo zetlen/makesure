@@ -182,10 +182,6 @@ export type ReportType = ReportConfig['type']
  */
 export interface NotifyConfig {
   /**
-   * Allow arbitrary notifier keys.
-   */
-  [key: string]: string | undefined
-  /**
    * Email address to notify.
    * @example "security@company.com"
    */

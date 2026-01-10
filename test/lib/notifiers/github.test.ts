@@ -15,12 +15,18 @@ describe('GitHub Notifier', () => {
   let reviewRequests: any[]
   let labelsAdded: any[]
   let workflowsDispatched: any[]
+  let warnings: any[][]
+  let originalConsoleWarn: any
 
   beforeEach(() => {
     comments = []
     reviewRequests = []
     labelsAdded = []
     workflowsDispatched = []
+    warnings = []
+
+    originalConsoleWarn = console.warn
+    console.warn = (...args) => warnings.push(args)
 
     mockOctokit = {
       rest: {
@@ -44,6 +50,10 @@ describe('GitHub Notifier', () => {
         },
       },
     }
+  })
+
+  afterEach(() => {
+    console.warn = originalConsoleWarn
   })
 
   it('aggregates mentions into a single comment', async () => {
@@ -95,5 +105,43 @@ describe('GitHub Notifier', () => {
     await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
 
     expect(reviewRequests).to.have.lengthOf(0)
+  })
+
+  it('handles invalid team format (empty slug)', async () => {
+    const configs: NotifyConfig[] = [{github_assign_reviewer: '@org/'}]
+
+    await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
+
+    expect(reviewRequests).to.have.lengthOf(0)
+  })
+
+  it('handles API errors gracefully', async () => {
+    mockOctokit.rest.issues.createComment = async () => {
+      throw new Error('API Error')
+    }
+
+    const configs: NotifyConfig[] = [{github_mention: '@user1'}]
+
+    await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
+
+    expect(warnings).to.have.lengthOf(1)
+    expect(warnings[0][0]).to.contain('Failed to post mention comment')
+  })
+
+  it('handles workflow dispatch errors gracefully', async () => {
+    mockOctokit.rest.actions.createWorkflowDispatch = async (args: any) => {
+      if (args.workflow_id === 'fail.yml') throw new Error('Dispatch Error')
+      workflowsDispatched.push(args)
+    }
+
+    const configs: NotifyConfig[] = [{github_workflow: 'success.yml, fail.yml'}]
+
+    await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
+
+    expect(workflowsDispatched).to.have.lengthOf(1)
+    expect(workflowsDispatched[0].workflow_id).to.equal('success.yml')
+
+    expect(warnings).to.have.lengthOf(1)
+    expect(warnings[0][0]).to.contain('Failed to dispatch workflow fail.yml')
   })
 })

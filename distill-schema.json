@@ -171,9 +171,6 @@
       "type": "object"
     },
     "NotifyConfig": {
-      "additionalProperties": {
-        "type": "string"
-      },
       "description": "Notification channel types and their target formats.",
       "properties": {
         "email": {
