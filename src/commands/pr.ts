@@ -3,9 +3,12 @@ import {resolve} from 'node:path'
 import {Octokit} from 'octokit'
 
 import {BaseCommand, type JsonOutput} from '../lib/base-command.js'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import {type NotifyConfig} from '../lib/configuration/config.js'
 import {loadConfig} from '../lib/configuration/loader.js'
 import {parseDiff} from '../lib/diff/parser.js'
 import {getCurrentBranch, getRemotes, getTrackingBranch, isInsideGitRepo} from '../lib/git/index.js'
+import {processNotifications} from '../lib/notifiers/github.js'
 import {processFiles} from '../lib/processing/runner.js'
 import {type ContentProvider} from '../lib/processing/types.js'
 
@@ -132,6 +135,20 @@ Requires GITHUB_TOKEN environment variable for authentication.`
       contentProvider,
       refs,
     })
+
+    // Collect and process notifications
+    const notifications = result.reports.map((r) => r.notify).filter(Boolean)
+
+    if (notifications.length > 0) {
+      this.debug('Processing %d notifications', notifications.length)
+      await processNotifications(notifications, {
+        octokit,
+        owner,
+        prNumber: number,
+        ref: pr.head.ref,
+        repo,
+      })
+    }
 
     return this.outputReports(result)
   }

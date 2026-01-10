@@ -182,6 +182,10 @@ export type ReportType = ReportConfig['type']
  */
 export interface NotifyConfig {
   /**
+   * Allow arbitrary notifier keys.
+   */
+  [key: string]: string | undefined
+  /**
    * Email address to notify.
    * @example "security@company.com"
    */
@@ -191,6 +195,26 @@ export interface NotifyConfig {
    * @example "@security-team"
    */
   github?: string
+  /**
+   * Assign a reviewer to the PR.
+   * @example "security-team"
+   */
+  'github-assign-reviewer'?: string
+  /**
+   * Add a label to the PR.
+   * @example "security-concern"
+   */
+  'github-label'?: string
+  /**
+   * Mention a user or team in a comment.
+   * @example "@security-team"
+   */
+  'github-mention'?: string
+  /**
+   * Trigger a GitHub workflow.
+   * @example "security-check.yml"
+   */
+  'github-workflow'?: string
   /**
    * Jira issue key to comment on.
    * @example "SEC-123"
