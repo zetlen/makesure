@@ -181,24 +181,24 @@
           "examples": ["security@company.com"],
           "type": "string"
         },
-        "github-assign-reviewer": {
-          "description": "Assign a reviewer to the PR.",
-          "examples": ["security-team"],
+        "github_assign_reviewer": {
+          "description": "Assign reviewers to the PR (comma-separated).",
+          "examples": ["@security-team, @senior-dev"],
           "type": "string"
         },
-        "github-label": {
-          "description": "Add a label to the PR.",
-          "examples": ["security-concern"],
+        "github_label": {
+          "description": "Add labels to the PR (comma-separated).",
+          "examples": ["security-concern, urgent"],
           "type": "string"
         },
-        "github-mention": {
-          "description": "Mention a user or team in a comment.",
-          "examples": ["@security-team"],
+        "github_mention": {
+          "description": "Mention users or teams in a comment (comma-separated).",
+          "examples": ["@security-team, @cto"],
           "type": "string"
         },
-        "github-workflow": {
-          "description": "Trigger a GitHub workflow.",
-          "examples": ["security-check.yml"],
+        "github_workflow": {
+          "description": "Trigger GitHub workflows (comma-separated).",
+          "examples": ["security-check.yml, audit.yml"],
           "type": "string"
         },
         "jira": {

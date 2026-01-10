@@ -191,25 +191,25 @@ export interface NotifyConfig {
    */
   email?: string
   /**
-   * Assign a reviewer to the PR.
-   * @example "security-team"
+   * Assign reviewers to the PR (comma-separated).
+   * @example "@security-team, @senior-dev"
    */
-  'github-assign-reviewer'?: string
+  github_assign_reviewer?: string
   /**
-   * Add a label to the PR.
-   * @example "security-concern"
+   * Add labels to the PR (comma-separated).
+   * @example "security-concern, urgent"
    */
-  'github-label'?: string
+  github_label?: string
   /**
-   * Mention a user or team in a comment.
-   * @example "@security-team"
+   * Mention users or teams in a comment (comma-separated).
+   * @example "@security-team, @cto"
    */
-  'github-mention'?: string
+  github_mention?: string
   /**
-   * Trigger a GitHub workflow.
-   * @example "security-check.yml"
+   * Trigger GitHub workflows (comma-separated).
+   * @example "security-check.yml, audit.yml"
    */
-  'github-workflow'?: string
+  github_workflow?: string
   /**
    * Jira issue key to comment on.
    * @example "SEC-123"

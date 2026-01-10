@@ -3,7 +3,7 @@ import {expect} from 'chai'
 import {NotifyConfig} from '../../../src/lib/configuration/config.js'
 import {processNotifications} from '../../../src/lib/notifiers/github.js'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, camelcase */
 describe('GitHub Notifier', () => {
   const owner = 'owner'
   const repo = 'repo'
@@ -47,25 +47,22 @@ describe('GitHub Notifier', () => {
   })
 
   it('aggregates mentions into a single comment', async () => {
-    const configs: NotifyConfig[] = [{'github-mention': '@user1'}, {'github-mention': '@user2'}]
+    const configs: NotifyConfig[] = [{github_mention: '@user1'}, {github_mention: '@user2, @user3'}]
 
     await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
 
     expect(comments).to.have.lengthOf(1)
     expect(comments[0].body).to.contain('@user1')
     expect(comments[0].body).to.contain('@user2')
+    expect(comments[0].body).to.contain('@user3')
   })
 
-  it('handles reviewers, labels and workflows', async () => {
+  it('handles comma-separated lists and snake_case keys', async () => {
     const configs: NotifyConfig[] = [
       {
-        'github-assign-reviewer': 'reviewer1',
-        'github-label': 'bug',
-        'github-workflow': 'ci.yml',
-      },
-      {
-        'github-assign-reviewer': 'org/team1',
-        'github-label': 'urgent',
+        github_assign_reviewer: '@reviewer1, @org/team1',
+        github_label: 'bug, urgent',
+        github_workflow: 'ci.yml, security.yml',
       },
     ]
 
@@ -79,8 +76,24 @@ describe('GitHub Notifier', () => {
     expect(labelsAdded[0].labels).to.include('bug')
     expect(labelsAdded[0].labels).to.include('urgent')
 
-    expect(workflowsDispatched).to.have.lengthOf(1)
-    expect(workflowsDispatched[0].workflow_id).to.equal('ci.yml')
-    expect(workflowsDispatched[0].ref).to.equal(ref)
+    expect(workflowsDispatched).to.have.lengthOf(2)
+    expect(workflowsDispatched.find((w) => w.workflow_id === 'ci.yml')).to.exist
+    expect(workflowsDispatched.find((w) => w.workflow_id === 'security.yml')).to.exist
+  })
+
+  it('ignores mentions without @ prefix', async () => {
+    const configs: NotifyConfig[] = [{github_mention: 'user1'}]
+
+    await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
+
+    expect(comments).to.have.lengthOf(0)
+  })
+
+  it('ignores reviewers without @ prefix', async () => {
+    const configs: NotifyConfig[] = [{github_assign_reviewer: 'user1'}]
+
+    await processNotifications(configs, {octokit: mockOctokit, owner, prNumber, ref, repo})
+
+    expect(reviewRequests).to.have.lengthOf(0)
   })
 })

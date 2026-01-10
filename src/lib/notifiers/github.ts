@@ -19,10 +19,21 @@ export async function processNotifications(configs: NotifyConfig[], context: Not
   const workflows = new Set<string>()
 
   for (const config of configs) {
-    if (config['github-mention']) mentions.add(config['github-mention'])
-    if (config['github-assign-reviewer']) reviewers.add(config['github-assign-reviewer'])
-    if (config['github-label']) labels.add(config['github-label'])
-    if (config['github-workflow']) workflows.add(config['github-workflow'])
+    if (config.github_mention) {
+      for (const m of parseList(config.github_mention)) mentions.add(m)
+    }
+
+    if (config.github_assign_reviewer) {
+      for (const r of parseList(config.github_assign_reviewer)) reviewers.add(r)
+    }
+
+    if (config.github_label) {
+      for (const l of parseList(config.github_label)) labels.add(l)
+    }
+
+    if (config.github_workflow) {
+      for (const w of parseList(config.github_workflow)) workflows.add(w)
+    }
   }
 
   await processMentions(mentions, context)
@@ -31,10 +42,23 @@ export async function processNotifications(configs: NotifyConfig[], context: Not
   await processWorkflows(workflows, context)
 }
 
+function parseList(input: string): string[] {
+  return input
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 async function processMentions(mentions: Set<string>, context: NotificationContext) {
   if (mentions.size === 0) return
 
-  const body = `Distill notifications:\n${[...mentions].join(' ')}`
+  // Validate that mentions start with @
+  const validMentions = [...mentions].filter((m) => m.startsWith('@'))
+
+  if (validMentions.length === 0) return
+
+  const body = `Distill notifications:
+${validMentions.join(' ')}`
   try {
     await context.octokit.rest.issues.createComment({
       body,
@@ -55,6 +79,8 @@ async function processReviewers(reviewers: Set<string>, context: NotificationCon
     const teams: string[] = []
 
     for (const reviewer of reviewers) {
+      if (!reviewer.startsWith('@')) continue
+
       // Clean up input
       const clean = reviewer.replace(/^@/, '')
 
